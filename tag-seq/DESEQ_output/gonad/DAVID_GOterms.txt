@@ -1,0 +1,54 @@
+OFFICIAL_GENE_SYMBOL	Name	Species
+115103583	dynein light chain 4, axonemal-like(LOC115103583)	Oncorhynchus nerka
+115113817	uncharacterized LOC115113817(LOC115113817)	Oncorhynchus nerka
+115137242	TNFAIP3-interacting protein 2-like(LOC115137242)	Oncorhynchus nerka
+115141078	C-type lectin domain family 12 member B-like(LOC115141078)	Oncorhynchus nerka
+115107536	complement C1q-like protein 2(LOC115107536)	Oncorhynchus nerka
+115114450	protein canopy-1-like(LOC115114450)	Oncorhynchus nerka
+115141572	cytochrome c oxidase subunit 7A2, mitochondrial-like(LOC115141572)	Oncorhynchus nerka
+115141189	free fatty acid receptor 2-like(LOC115141189)	Oncorhynchus nerka
+115141190	free fatty acid receptor 2-like(LOC115141190)	Oncorhynchus nerka
+115137856	equistatin-like(LOC115137856)	Oncorhynchus nerka
+115137857	ladderlectin-like(LOC115137857)	Oncorhynchus nerka
+115115202	uncharacterized protein CFAP97D2-like(LOC115115202)	Oncorhynchus nerka
+115137858	equistatin-like(LOC115137858)	Oncorhynchus nerka
+115137859	saxiphilin-like(LOC115137859)	Oncorhynchus nerka
+115132668	receptor-transporting protein 3-like(LOC115132668)	Oncorhynchus nerka
+115122036	intraflagellar transport protein 56(LOC115122036)	Oncorhynchus nerka
+115130098	la-related protein 4B-like(LOC115130098)	Oncorhynchus nerka
+115112946	ADP-ribosylation factor 4-like(LOC115112946)	Oncorhynchus nerka
+115141356	C-type lectin domain family 4 member E-like(LOC115141356)	Oncorhynchus nerka
+115108974	RIB43A-like with coiled-coils protein 2(LOC115108974)	Oncorhynchus nerka
+115123433	dentin sialophosphoprotein-like(LOC115123433)	Oncorhynchus nerka
+115101161	paired box protein Pax-8-like(LOC115101161)	Oncorhynchus nerka
+115112426	serum amyloid A-5 protein-like(LOC115112426)	Oncorhynchus nerka
+115112427	serum amyloid A-5 protein-like(LOC115112427)	Oncorhynchus nerka
+115105764	neurofibromin-like(LOC115105764)	Oncorhynchus nerka
+115107045	uncharacterized LOC115107045(LOC115107045)	Oncorhynchus nerka
+115141350	CD209 antigen-like protein E(LOC115141350)	Oncorhynchus nerka
+115108322	transmembrane protein 59-like(LOC115108322)	Oncorhynchus nerka
+115107483	adhesion G protein-coupled receptor F5-like(LOC115107483)	Oncorhynchus nerka
+115131920	testis-expressed protein 49-like(LOC115131920)	Oncorhynchus nerka
+115139472	enoyl-[acyl-carrier-protein] reductase, mitochondrial-like(LOC115139472)	Oncorhynchus nerka
+115110674	forkhead box protein J1-A-like(LOC115110674)	Oncorhynchus nerka
+115101837	ubiquitin-conjugating enzyme E2 U-like(LOC115101837)	Oncorhynchus nerka
+115139209	sterile alpha motif domain-containing protein 15-like(LOC115139209)	Oncorhynchus nerka
+115122569	paired box protein Pax-8-like(LOC115122569)	Oncorhynchus nerka
+115120516	patched domain-containing protein 3-like(LOC115120516)	Oncorhynchus nerka
+115143556	E3 ubiquitin-protein ligase NEURL1-like(LOC115143556)	Oncorhynchus nerka
+115138053	cytochrome b5 domain-containing protein 1(LOC115138053)	Oncorhynchus nerka
+115103238	homer protein homolog 3-like(LOC115103238)	Oncorhynchus nerka
+115146113	gamma-aminobutyric acid receptor subunit beta-1-like(LOC115146113)	Oncorhynchus nerka
+115128579	anterior gradient protein 2 homolog(LOC115128579)	Oncorhynchus nerka
+115132860	homeobox protein Hox-C9-like(LOC115132860)	Oncorhynchus nerka
+115105983	MORN repeat-containing protein 5-like(LOC115105983)	Oncorhynchus nerka
+115104313	forkhead box protein J1-A-like(LOC115104313)	Oncorhynchus nerka
+115137594	somatolactin(LOC115137594)	Oncorhynchus nerka
+115120950	uncharacterized LOC115120950(LOC115120950)	Oncorhynchus nerka
+115145526	protein FAM183A-like(LOC115145526)	Oncorhynchus nerka
+115141814	14-3-3 protein gamma-2-like(LOC115141814)	Oncorhynchus nerka
+115146679	dynein light chain Tctex-type 1-like(LOC115146679)	Oncorhynchus nerka
+115117106	cyclin-dependent kinase inhibitor 1B-like(LOC115117106)	Oncorhynchus nerka
+115138857	ladderlectin-like(LOC115138857)	Oncorhynchus nerka
+115138859	ladderlectin-like(LOC115138859)	Oncorhynchus nerka
+115125542	calcyphosin-like protein(LOC115125542)	Oncorhynchus nerka

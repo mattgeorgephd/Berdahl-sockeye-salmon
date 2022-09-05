@@ -158,13 +158,6 @@ screeplot(p, axisLabSize = 18, titleLabSize = 22)
 biplot(p, showLoadings = TRUE, colby = 'trt',
     labSize = 5, pointSize = 5, sizeLoadingsNames = 5)
 
-# A - diploid; control
-# B - triploid; control
-# C - diploid; heat
-# D - triploid; heat
-# E - diploid; desiccation
-# F - triploid; desiccation
-
 bp1 <- biplot(p, x = "PC1", y = "PC2",
               colby = 'trt',
               colkey = c('territorial' = 'royalblue1' , 
@@ -242,7 +235,7 @@ setwd('..')
 
 ```{r}
 # Generate Contrasts
-contrast_list    <- c("trt","territorial", "social")
+contrast_list    <- c("trt","territorial", "social") # factor, treatment group, control
 res_table        <- results(dds, contrast=contrast_list, alpha = 0.05)
 res_table_normal <- lfcShrink(dds,
                               coef=2, 
