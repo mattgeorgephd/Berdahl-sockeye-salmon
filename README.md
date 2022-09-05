@@ -1,5 +1,8 @@
 # Berdahl-sockeye-salmon
 
+### Locations
+1. [Gannet folder](https://gannet.fish.washington.edu/panopea/berdahl-sockeye-salmon/)
+
 ### Github issues:
 1. [Sam's initial experiments w/ RNA extraction](https://github.com/RobertsLab/resources/issues/1307)
 2. [Matt & Sam - issues with RNA extractions](https://github.com/RobertsLab/resources/issues/1410)
