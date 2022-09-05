@@ -459,24 +459,68 @@ p7 <- ggplot(sig_genes_ashr, aes(x = log2FoldChange, y = -log10(pvalue))) +
 p8 <- ggplot(sig_genes_apeglm, aes(x = log2FoldChange, y = -log10(pvalue))) +
              geom_point(aes(color=log2FoldChange>0))
 
+ggsave("DESEQ_output/gonad/Volcano_all_genes.png",
+       plot   = p1,
+       dpi    = 600,
+       device = "png",
+       width  = 6,
+       height = 4,
+       units  = "in")
 
-      # geom_point(aes(color = Significant)) +
-      # scale_color_manual(values = c("red", "grey")) +
-      # theme_bw(base_size = 12) + theme(legend.position = "bottom") +
-      # geom_text_repel(
-      #     data = subset(genes, padj < 0.05),
-      #     aes(label = Gene),
-      #     size = 5,
-      #     box.padding = unit(0.35, "lines"),
-      #     point.padding = unit(0.3, "lines"))
-# 
-# ggsave("analyses/CS/bp_CS_all.png",
-#        plot   = bp1,
-#        dpi    = 600,
-#        device = "png",
-#        width  = 4.5,
-#        height = 4,
-#        units  = "in")
+ggsave("DESEQ_output/gonad/Volcano_all_genes_normal.png",
+       plot   = p2,
+       dpi    = 600,
+       device = "png",
+       width  = 6,
+       height = 4,
+       units  = "in")
 
+ggsave("DESEQ_output/gonad/Volcano_all_genes_ashr.png",
+       plot   = p3,
+       dpi    = 600,
+       device = "png",
+       width  = 6,
+       height = 4,
+       units  = "in")
+
+ggsave("DESEQ_output/gonad/Volcano_all_genes_apeglm.png",
+       plot   = p4,
+       dpi    = 600,
+       device = "png",
+       width  = 6,
+       height = 4,
+       units  = "in")
+
+ggsave("DESEQ_output/gonad/Volcano_sig_genes.png",
+       plot   = p5,
+       dpi    = 600,
+       device = "png",
+       width  = 6,
+       height = 4,
+       units  = "in")
+
+ggsave("DESEQ_output/gonad/Volcano_sig_genes_normal.png",
+       plot   = p6,
+       dpi    = 600,
+       device = "png",
+       width  = 6,
+       height = 4,
+       units  = "in")
+
+ggsave("DESEQ_output/gonad/Volcano_sig_genes_ashr.png",
+       plot   = p7,
+       dpi    = 600,
+       device = "png",
+       width  = 6,
+       height = 4,
+       units  = "in")
+
+ggsave("DESEQ_output/gonad/Volcano_sig_genes_apeglm.png",
+       plot   = p8,
+       dpi    = 600,
+       device = "png",
+       width  = 6,
+       height = 4,
+       units  = "in")
 
 ```

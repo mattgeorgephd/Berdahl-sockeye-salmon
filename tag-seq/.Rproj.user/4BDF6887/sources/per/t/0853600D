@@ -3,9 +3,9 @@
     "path": "C:/Users/mattg/Dropbox/UW/Postdoc/2022_Berdahl_sockeye_salmon/Berdahl-sockeye-salmon/tag-seq/code/2_DESeq2_analysis-salmon.Rmd",
     "project_path": "code/2_DESeq2_analysis-salmon.Rmd",
     "type": "r_markdown",
-    "hash": "0",
+    "hash": "1265614459",
     "contents": "",
-    "dirty": true,
+    "dirty": false,
     "created": 1662356065380.0,
     "source_on_save": false,
     "relative_order": 1,
@@ -17,11 +17,11 @@
         "scrollLine": "444"
     },
     "folds": "",
-    "lastKnownWriteTime": 1662357000,
+    "lastKnownWriteTime": 1662357281,
     "encoding": "ISO8859-1",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1662357230193,
+    "last_content_update": 1662357281563,
     "read_only": false,
     "read_only_alternatives": []
 }
