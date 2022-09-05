@@ -1,0 +1,2 @@
+"0","abline(h=c(-1.5,1.5), col=""dodgerblue"", lwd=2)"
+"0","DESeq2::plotMA(res_table_ashr, xlim=xlim, ylim=ylim, main=""ashr"", cex=.8)"

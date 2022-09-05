@@ -1,0 +1,5 @@
+"0",""
+"0","# Plot pheatmap"
+"0","rld <- rlog(dds, blind=T)"
+"0","rld_mat <- assay(rld)"
+"0","pca <- prcomp(t(rld_mat))"

@@ -1,0 +1,4 @@
+"0",""
+"0","# Plot PCA"
+"0","p <- pca(assay(vst(dds)), metadata = coldata_trt)"
+"0","screeplot(p, axisLabSize = 18, titleLabSize = 22)"

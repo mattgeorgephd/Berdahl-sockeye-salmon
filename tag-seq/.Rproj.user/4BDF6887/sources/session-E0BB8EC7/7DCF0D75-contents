@@ -1,0 +1,443 @@
+---
+title: "2_DESeq_analysis"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE, warning = TRUE, message = FALSE, cache = TRUE)
+```
+
+```{bash, engine.opts='-l'}
+echo $PATH
+```
+
+### Download files
+```{bash}
+cd genome
+
+
+
+
+```
+
+
+
+### Load libraries
+```{r load_libraries, inlcude = TRUE}
+
+## Install Rtools directly from (https://cran.r-project.org/bin/windows/Rtools/), then install these on first run:
+# install.packages("BiocManager")
+# BiocManager::install("DESeq2")
+# BiocManager::install("vsn")
+# BiocManager::install("tidybulk")
+# BiocManager::install("goseq")
+# BiocManager::install("affycoretools")
+# BiocManager::install("EnhancedVolcano")
+# BiocManager::install("pcaExplorer")
+# BiocManager::install("apeglm")
+# BiocManager::install("PCAtools")
+
+
+# List of packages we want to install (run every time)
+load.lib<-c("DESeq2","edgeR","goseq","dplyr","GenomicFeatures","data.table","calibrate","affycoretools","data.table","vsn","tidybulk","ggplot2","cowplot","pheatmap","gplots","RColorBrewer","EnhancedVolcano","pcaExplorer","readxl","apeglm","ashr","tibble","plotly","sqldf","PCAtools","ggpubr")
+
+# Select only the packages that aren't currently installed (run every time)
+install.lib <- load.lib[!load.lib %in% installed.packages()]
+
+# And finally we install the missing packages, including their dependency.
+for(lib in install.lib) install.packages(lib,dependencies=TRUE)
+# After the installation process completes, we load all packages.
+sapply(load.lib,require,character=TRUE)
+                        
+```
+
+#Set ggplot theme
+```{r ggplot_theme, include=FALSE}
+
+my_theme <- theme(line              = element_line(size=1.5),
+                  rect              = element_rect(size=1.5),
+                  text              = element_text(size=14,color="black"),
+                  panel.background  = element_blank(),
+                  panel.grid.major  = element_blank(), 
+                  panel.grid.minor  = element_blank(),
+                  axis.text.x       = element_text(size=16,color="black"),
+                  axis.text.y       = element_text(size=16,color="black"),
+                  axis.title.x      = element_text(margin = margin(t = 10, r = 0, b = 0, l = 0)),
+                  axis.title.y      = element_text(margin = margin(t = 0, r = 10, b = 0, l = 0)),
+                  axis.ticks.x      = element_line(color="black"),
+                  axis.ticks.y      = element_line(color="black"),
+                  # axis.line         = element_line(color = "black", size = 0.1),
+                  panel.border      = element_rect(color = "black", fill=NA, size=1.5),
+                  legend.key        = element_blank()) # removes background of legend bullets
+```
+
+# Generate LOCID table
+```{bash}
+cd genome
+# awk -F "\t" '$1 == "mRNA" {print $15, "\t", $14}' GCF_006149115.2_Oner_1.1_feature_table.txt > Onerka_LOCID_gene_table.txt
+# This worked, but I had to mannually remove an extra space after the LOCID for left_join to work later --> saved to gannet, just grab it there
+
+wget -r \
+--no-directories --no-parent \
+-P . \
+-A Onerka_LOCID_gene_table.txt https://gannet.fish.washington.edu/panopea/berdahl-sockeye-salmon/genome/ \
+--no-check-certificate
+
+```
+
+#Load data
+```{r load_data, inlcude = TRUE}
+# Load LOCID to gene description tables (mRNA track)
+Onerka_feature_table <- read.delim("genome/Onerka_LOCID_gene_table.txt", header = TRUE)
+colnames(Onerka_feature_table) <- c("LOCID","description")
+Onerka_feature_table <- distinct(Onerka_feature_table, LOCID, .keep_all = TRUE)
+
+# Import experimental design information
+trt_list <- read.csv("data/treatments.csv", sep=',', header=TRUE, row.names = "ID")
+coldata <- trt_list
+
+# Import gene_count_matrix
+cts <- as.matrix(read.csv("data/onerka_gene_count_matrix.csv", sep=',', header=TRUE, row.names = "gene_id"))
+colnames(cts) <- row.names(trt_list) #!make sure column and row names for coldata and cts match
+all(colnames(cts) %in% rownames(coldata))
+
+# Factor independent variables
+coldata$trt   <- factor(coldata$trt) # for individual pair-wise comparisons
+coldata$tissue <- factor(coldata$tissue)
+
+# Remove bad samples
+# MuliQC report:
+# Pheatmap: C05, C17
+coldata <- coldata[!(row.names(coldata) %in% c('C05', 'C17')),]
+cts <- as.matrix(subset(cts, select=-c(C05, C17)))
+coldata %>% dplyr::count(trt)
+all(colnames(cts) %in% rownames(coldata))
+
+# # Reorder cts/coldata by group for easy visualization in pcaexplorer
+# coldata <- coldata %>% arrange(group)
+# col.order <- rownames(coldata)
+# cts <- cts[,col.order]
+
+# Remove gene-LOC designation from LOC #
+rs <- (rownames(cts))
+rs <- strsplit(rs, split = "LOC")
+output <- matrix(ncol=1, nrow=length(rs))
+# colnames(output) <- c("x","y","z")
+for (i in 1:length(rs)){
+  LOC_number <- as.data.frame(rs[[i]])
+  add_val <- paste("LOC",LOC_number[3,1],sep="")
+  output[i,] <- add_val
+}
+rownames(cts) <- output
+
+```
+
+# Create output folders
+```{bash}
+
+cd DESEQ_output
+
+# samples included _ variable analyzed (when 1 specified, compared to control)
+mkdir gonad
+
+```
+
+# Gonad
+```{r ALL:TRT:ploidy, warning=FALSE, include=TRUE}
+
+# Filter data
+coldata_trt <- coldata # %>% filter(group == "A" | group == "B")
+cts_trt     <- subset(cts, select=row.names(coldata_trt))
+
+# Calculate DESeq object
+dds <- DESeqDataSetFromMatrix(countData = cts_trt,
+                              colData = coldata_trt,
+                              design = ~ trt)
+dds <- DESeq(dds)
+resultsNames(dds) # lists the coefficients
+
+# Filtering: keep genes that have at least 10 counts across all samples - https://support.bioconductor.org/p/110307/
+dds <- dds[rowSums(DESeq2::counts(dds)) >= 10,]
+```
+
+```{r}
+
+# Plot PCA
+p <- pca(assay(vst(dds)), metadata = coldata_trt)
+screeplot(p, axisLabSize = 18, titleLabSize = 22)
+biplot(p, showLoadings = TRUE, colby = 'trt',
+    labSize = 5, pointSize = 5, sizeLoadingsNames = 5)
+
+# A - diploid; control
+# B - triploid; control
+# C - diploid; heat
+# D - triploid; heat
+# E - diploid; desiccation
+# F - triploid; desiccation
+
+bp1 <- biplot(p, x = "PC1", y = "PC2",
+              colby = 'trt',
+              colkey = c('territorial' = 'royalblue1' , 
+                         'social'      = 'orangered1'),
+              shape = 'trt',
+              shapekey = c('territorial' = 19,  # circle
+                           'social' = 17), # triangle
+              pointSize = 4,
+              showLoadings = FALSE,
+              lab = NULL,
+              drawConnectors = FALSE,
+              ellipse = TRUE,
+              ellipseLevel = 0.95,
+              ellipseFill = FALSE,
+              # ellipseFillKey = c('diploid' = 'blue', 'triploid' = 'green'),
+              ellipseAlpha = 1/4,
+              ellipseLineSize = 1,
+              xlim = c(-300,150), ylim = c(-100, 150),
+              gridlines.major = FALSE,
+              gridlines.minor = FALSE,
+              borderWidth = 1,
+              legendPosition = 'top', legendLabSize = 16, legendIconSize = 6.0) + 
+              theme(axis.text.x       = element_text(size=16,color="black"),
+                    axis.text.y       = element_text(size=16,color="black"),
+                    axis.ticks.x      = element_line(color="black"),
+                    axis.ticks.y      = element_line(color="black"))
+bp1
+
+bp2 <- pairsplot(p,
+                components = getComponents(p, c(1:5)),
+                triangle = TRUE, trianglelabSize = 12,
+                hline = 0, vline = 0,
+                pointSize = 1,
+                gridlines.major = FALSE, gridlines.minor = FALSE,
+                colby = 'trt',
+                title = 'Pairs plot', plotaxes = FALSE,
+                margingaps = unit(c(-0.01, -0.01, -0.01, -0.01), 'cm'))
+bp2
+
+# Plot pheatmap
+rld <- rlog(dds, blind=T)
+rld_mat <- assay(rld)
+pca <- prcomp(t(rld_mat))
+rld_cor <- cor(rld_mat)
+bp3 <- pheatmap(rld_cor, annotation = coldata_trt[,1:2])
+
+bp3
+
+setwd("DESEQ_output/gonad")
+
+ggexport(filename = "GONAD-PCA.png",
+         plot   = bp1,
+         res    = 600,
+         # device = "png",
+         width  = 4000,
+         height = 5000)
+
+ggexport(filename = "GONAD-PAIRS.png",
+         plot   = bp2,
+         res    = 600,
+         width  = 6000,
+         height = 6000)
+
+ggexport(filename = "GONAD-pheatmap.png",
+         plot   = bp3,
+         res    = 600,
+         width  = 6000,
+         height = 6000)
+
+# pcaExplorer(dds = dds_ploidy)
+
+setwd('..')
+setwd('..')
+```
+
+```{r}
+# Generate Contrasts
+contrast_list    <- c("trt","territorial", "social")
+res_table        <- results(dds, contrast=contrast_list, alpha = 0.05)
+res_table_normal <- lfcShrink(dds,
+                              coef=2, 
+                              type="normal") # lfcThreshold = 0.585)  # a lfc threshold of 1 = 2-fold change, 0.585 = 1.5-fold change
+res_table_apeglm <- lfcShrink(dds,
+                              coef=2, 
+                              type="apeglm") # lfcThreshold = 0.585)  # a lfc threshold of 1 = 2-fold change, 0.585 = 1.5-fold change
+res_table_ashr   <- lfcShrink(dds,
+                              coef=2, 
+                              type="ashr")
+
+# Plot MA
+par(mfrow=c(1,3), mar=c(4,4,2,1))
+xlim <- c(1,1e5); ylim <- c(-3,3)
+DESeq2::plotMA(res_table_normal, xlim=xlim, ylim=ylim, main="normal", cex=.8)
+abline(h=c(-1.5,1.5), col="dodgerblue", lwd=2)
+DESeq2::plotMA(res_table_apeglm, xlim=xlim, ylim=ylim, main="apeglm", cex=.8)
+abline(h=c(-1.5,1.5), col="dodgerblue", lwd=2)
+DESeq2::plotMA(res_table_ashr, xlim=xlim, ylim=ylim, main="ashr", cex=.8)
+abline(h=c(-1.5,1.5), col="dodgerblue", lwd=2)
+
+pdf(file= "DESEQ_output/gonad/MA_plots.pdf" )
+par(mfrow=c(1,3), mar=c(4,4,2,1))
+xlim <- c(1,1e5); ylim <- c(-3,3)
+DESeq2::plotMA(res_table_normal, xlim=xlim, ylim=ylim, main="normal", cex=.8)
+abline(h=c(-1.5,1.5), col="dodgerblue", lwd=2)
+DESeq2::plotMA(res_table_apeglm, xlim=xlim, ylim=ylim, main="apeglm", cex=.8)
+abline(h=c(-1.5,1.5), col="dodgerblue", lwd=2)
+DESeq2::plotMA(res_table_ashr, xlim=xlim, ylim=ylim, main="ashr", cex=.8)
+abline(h=c(-1.5,1.5), col="dodgerblue", lwd=2)
+dev.off()
+
+# Set cut.offs
+padj.cutoff <- 0.05 # pvalues not produced with apeglm shrinkage estimator
+svalue.cutoff <- 0.005 # 0.005 corresponds to pvalue of 0.05
+lfc.cutoff <- 1.5 # fold-change cutoff, 1.5 or 2-fold is recommended
+
+# Rearrange tables by gene
+res_table <- res_table %>%
+  data.frame() %>%
+  rownames_to_column(var="gene") %>%
+  as_tibble()
+
+res_table_normal <- res_table_normal %>%
+  data.frame() %>%
+  rownames_to_column(var="gene") %>%
+  as_tibble()
+
+res_table_apeglm <- res_table_apeglm %>%
+  data.frame() %>%
+  rownames_to_column(var="gene") %>%
+  as_tibble()
+
+res_table_ashr <- res_table_ashr %>%
+  data.frame() %>%
+  rownames_to_column(var="gene") %>%
+  as_tibble()
+```
+
+```{r}
+# How many genes are differentially expressed compared to Control?
+colnames(Onerka_feature_table) <- c("gene","description")
+all_genes           <- left_join(res_table, Onerka_feature_table, by = "gene")
+all_genes           <- all_genes %>% arrange(-log2FoldChange)
+all_genes$treatment <- "gonad"
+# all_genes_pvalue    <- cbind(gene=all_genes$gene,padj=all_genes$padj)
+
+all_genes_normal           <- left_join(res_table_normal, Onerka_feature_table, by = "gene")
+all_genes_normal           <- all_genes_normal %>% arrange(-log2FoldChange)
+all_genes_normal$treatment <- "gonad"
+
+all_genes_apeglm           <- left_join(res_table_apeglm, Onerka_feature_table, by = "gene")
+all_genes_apeglm           <- all_genes_apeglm %>% arrange(-log2FoldChange)
+# all_genes_apeglm           <- left_join(all_genes_apeglm, as.data.frame(all_genes_pvalue), by = "gene")
+all_genes_apeglm$treatment <- "gonad"
+
+all_genes_ashr           <- left_join(res_table_ashr, Onerka_feature_table, by = "gene")
+all_genes_ashr           <- all_genes_ashr %>% arrange(-log2FoldChange)
+all_genes_ashr$treatment <- "gonad"
+
+# Filter results by
+sig_genes <- res_table %>%
+  filter(padj < padj.cutoff & abs(log2FoldChange) > lfc.cutoff)
+sig_genes <- left_join(sig_genes, Onerka_feature_table, by = "gene")
+sig_genes <- sig_genes %>% arrange(-log2FoldChange)
+sig_genes$treatment <- "gonad" 
+
+sig_genes_normal <- res_table_normal %>%
+  filter(abs(log2FoldChange) > lfc.cutoff)
+sig_genes_normal <- left_join(sig_genes_normal, Onerka_feature_table, by = "gene")
+sig_genes_normal <- sig_genes_normal %>% arrange(-log2FoldChange)
+sig_genes_normal$treatment <- "gonad" 
+
+sig_genes_apeglm <- res_table_apeglm %>%
+  filter(padj < padj.cutoff & abs(log2FoldChange) > lfc.cutoff)
+sig_genes_apeglm <- left_join(sig_genes_apeglm, Onerka_feature_table, by = "gene")
+sig_genes_apeglm <- sig_genes_apeglm %>% arrange(-log2FoldChange)
+sig_genes_apeglm$treatment <- "gonad" 
+
+sig_genes_ashr <- res_table_ashr %>%
+  filter(padj < padj.cutoff & abs(log2FoldChange) > lfc.cutoff)
+sig_genes_ashr <- left_join(sig_genes_ashr, Onerka_feature_table, by = "gene")
+sig_genes_ashr <- sig_genes_ashr %>% arrange(-log2FoldChange)
+sig_genes_ashr$treatment <- "gonad" 
+
+# Save single gene expression counts to a data frame object, for each shrinkage estimator
+single_gene_expression_unshrunk <- data.frame()
+for (i in 1:nrow(sig_genes)){
+  LOCID <- sig_genes$gene[i]
+  gene_counts_data <- plotCounts(dds, gene=LOCID, intgroup="trt", returnData=TRUE)
+  gene_counts_data$gene <- LOCID
+  gene_counts_data$sample <- row.names(gene_counts_data)
+  row.names(gene_counts_data) <- NULL
+  single_gene_expression_unshrunk <- rbind(single_gene_expression_unshrunk,gene_counts_data)
+  rm(gene_counts_data)
+}
+
+single_gene_expression_normal <- data.frame()
+for (i in 1:nrow(sig_genes_normal)){
+  LOCID <- sig_genes_normal$gene[i]
+  gene_counts_data <- plotCounts(dds, gene=LOCID, intgroup="trt", returnData=TRUE)
+  gene_counts_data$gene <- LOCID
+  gene_counts_data$sample <- row.names(gene_counts_data)
+  row.names(gene_counts_data) <- NULL
+  single_gene_expression_normal <- rbind(single_gene_expression_normal,gene_counts_data)
+  rm(gene_counts_data)
+}
+
+
+single_gene_expression_apeglm <- data.frame()
+for (i in 1:nrow(sig_genes_apeglm)){
+  LOCID <- sig_genes_apeglm$gene[i]
+  gene_counts_data <- plotCounts(dds, gene=LOCID, intgroup="trt", returnData=TRUE)
+  gene_counts_data$gene <- LOCID
+  gene_counts_data$sample <- row.names(gene_counts_data)
+  row.names(gene_counts_data) <- NULL
+  single_gene_expression_apeglm <- rbind(single_gene_expression_apeglm,gene_counts_data)
+  rm(gene_counts_data)
+}
+
+single_gene_expression_ashr <- data.frame()
+for (i in 1:nrow(sig_genes_ashr)){
+  LOCID <- sig_genes_ashr$gene[i]
+  gene_counts_data <- plotCounts(dds, gene=LOCID, intgroup="trt", returnData=TRUE)
+  gene_counts_data$gene <- LOCID
+  gene_counts_data$sample <- row.names(gene_counts_data)
+  row.names(gene_counts_data) <- NULL
+  single_gene_expression_ashr <- rbind(single_gene_expression_ashr,gene_counts_data)
+  rm(gene_counts_data)
+}
+
+write.table(single_gene_expression_unshrunk, file = "DESEQ_output/gonad/GONAD-unshrunk-single-gene-counts.csv", row.names = FALSE)
+write.table(single_gene_expression_normal, file = "DESEQ_output/gonad/GONAD-normal-single-gene-counts.csv", row.names = FALSE)
+write.table(single_gene_expression_apeglm, file = "DESEQ_output/gonad/GONAD-apeglm-single-gene-counts.csv", row.names = FALSE)
+write.table(single_gene_expression_ashr, file = "DESEQ_output/gonad/GONAD-ashr-single-gene-counts.csv", row.names = FALSE)
+
+print(paste("# genes before filtering:", nrow(cts))) # count number of genes before filtering
+print(paste("# genes after filtering:", length(dds))) # count number of genes after filtering
+print(paste("# of genes dropped:", nrow(cts) - length(dds), sep=" ")) # count number of genes dropped
+print(paste("# DEGs, all-genes:", nrow(all_genes)))
+print(paste("# DEGs, unshrunken, pvalue = 0.05, lfc = 1.5:", nrow(sig_genes)))
+print(paste("# DEGs, normal shrinkage estimator, lfc = 1.5:", nrow(sig_genes_normal)))
+print(paste("# DEGs, apeglm shrinkage estimator, svalue = 0.005, lfc = 1.5:", nrow(sig_genes_apeglm)))
+print(paste("# DEGs, ashr shrinkage estimator, pvalue = 0.05, lfc = 1.5:", nrow(sig_genes_ashr)))
+gene_counts <- as.data.frame(c(nrow(cts),length(dds),(nrow(cts)-length(dds)),nrow(all_genes),
+                            nrow(all_genes_normal),nrow(all_genes_apeglm),nrow(all_genes_ashr),
+                            nrow(sig_genes),nrow(sig_genes_normal),
+                            nrow(sig_genes_apeglm),nrow(sig_genes_ashr)))
+row.names(gene_counts) <- c("genes_before_filtering","genes_after_filtering","genes_dropped",
+                            "DEGs_all-genes","DEGs_all-genes-normal",
+                            "DEGs_all-genes-apeglm","DEGs_all-genes-ashr",
+                            "DEG_unshrunken-p0.05_lfc1.5","DEG_normal-lfc1.5",
+                            "DEG_apeglm-s0.005_lfc1.5","DEG_ashr-p0.05_lfc1.5")
+colnames(gene_counts) <- "count"
+
+# Output tables of DEGs
+write.table(all_genes,        file = "DESEQ_output/gonad/GONAD-ALL-DEG.csv",            row.names = FALSE, sep = ",")
+write.table(all_genes_normal, file = "DESEQ_output/gonad/GONAD-ALL-DEG-normal.csv",     row.names = FALSE, sep = ",")
+write.table(all_genes_apeglm, file = "DESEQ_output/gonad/GONAD-ALL-DEG-apeglm.csv",     row.names = FALSE, sep = ",")
+write.table(all_genes_ashr,   file = "DESEQ_output/gonad/GONAD-ALL-DEG-ashr.csv",       row.names = FALSE, sep = ",")
+write.table(sig_genes,        file = "DESEQ_output/gonad/GONAD-SIG-DEG-unshrunken.csv", row.names = FALSE, sep = ",")
+write.table(sig_genes_normal, file = "DESEQ_output/gonad/GONAD-SIG-DEG-normal.csv",     row.names = FALSE, sep = ",")
+write.table(sig_genes_apeglm, file = "DESEQ_output/gonad/GONAD-SIG-DEG-apeglm.csv",     row.names = FALSE, sep = ",")
+write.table(sig_genes_ashr,   file = "DESEQ_output/gonad/GONAD-SIG-DEG-ashr.csv",       row.names = FALSE, sep = ",")
+write.table(gene_counts,      file = "DESEQ_output/gonad/GONAD-gene-counts.csv",        row.names = TRUE)
+
+```
