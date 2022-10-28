@@ -2,6 +2,7 @@
 
 ### Locations
 1. [Gannet folder](https://gannet.fish.washington.edu/panopea/berdahl-sockeye-salmon/)
+2. [Manuscript](https://docs.google.com/document/d/19xcEKJfSdz6b7KGZAEr76w9NrCF5RPQ99FFtRt-G-wI/edit?usp=sharing)
 
 ### Github issues:
 1. [Sam's initial experiments w/ RNA extraction](https://github.com/RobertsLab/resources/issues/1307)
