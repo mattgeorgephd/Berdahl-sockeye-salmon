@@ -7,9 +7,11 @@ output: html_notebook
 ```{bash, engine.opts='-l'}
 echo $PATH
 ```
+
 # Get sockeye salmon assembly: https://www.ncbi.nlm.nih.gov/assembly/GCF_006149115.2
 ```{bash}
 
+mkdir sequences
 cd sequences/
 
 wget -r \
@@ -55,50 +57,135 @@ sequences/GCF_006149115.2_Oner_1.1_genomic.gff \
 head sequences/GCF_006149115.2_Oner_1.1_mRNA.gff
 ```
 
-# Download tag-seq data
+# Download tag-seq data - gonad
 ```{bash}
-mkdir raw-data/
-cd raw-data/
+mkdir raw-data-gonad/
+cd raw-data-gonad/
 
 wget -r \
 --no-directories --no-parent \
 -P . \
--A .fastq.gz https://gannet.fish.washington.edu/panopea/berdahl-sockeye-salmon/20220714-tagseq/ \
+-A .fastq.gz https://gannet.fish.washington.edu/panopea/berdahl-sockeye-salmon/20220714-tagseq-gonad/ \
 --no-check-certificate
+
 ```
 
-# unzip .fastq.gz files
+# Download tag-seq data - liver
 ```{bash}
-cd raw-data/
+mkdir raw-data-liver/
+cd raw-data-liver/
+
+wget -r \
+--no-directories --no-parent \
+-P . \
+-A .fastq.gz https://gannet.fish.washington.edu/panopea/berdahl-sockeye-salmon/20220917-tagseq-liver/ \
+--no-check-certificate
+
+```
+
+# Download tag-seq data - brain
+```{bash}
+mkdir raw-data-brain/
+cd raw-data-brain/
+
+wget -r \
+--no-directories --no-parent \
+-P . \
+-A .fastq.gz https://gannet.fish.washington.edu/panopea/berdahl-sockeye-salmon/20220917-tagseq-brain/ \
+--no-check-certificate
+
+```
+
+
+# unzip .fastq.gz files - gonad
+```{bash}
+cd raw-data-gonad/
 gunzip *.fastq.gz
 ```
 
-# Run fastqc on untrimmed files
+# unzip .fastq.gz files - liver
 ```{bash}
-mkdir fastqc/
-mkdir fastqc/untrimmed/
+cd raw-data-liver/
+gunzip *.fastq.gz
+```
+
+# unzip .fastq.gz files - brain
+```{bash}
+cd raw-data-brain/
+gunzip *.fastq.gz
+```
+
+# Run fastqc on untrimmed files - gonad
+```{bash}
+mkdir fastqc-gonad/
+mkdir fastqc-gonad/untrimmed/
 
 /home/shared/FastQC/fastqc \
-/home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/raw-data/*.fastq \
---outdir /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/fastqc/untrimmed/ \
+/home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/raw-data-gonad/*.fastq \
+--outdir /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/fastqc-gonad/untrimmed/ \
 --quiet
 
 ```
 
-# Run multiqc
+# Run fastqc on untrimmed files - liver
+```{bash}
+mkdir fastqc-liver/
+mkdir fastqc-liver/untrimmed/
+
+/home/shared/FastQC/fastqc \
+/home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/raw-data-liver/*.fastq \
+--outdir /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/fastqc-liver/untrimmed/ \
+--quiet
+
+```
+
+# Run fastqc on untrimmed files - brain
+```{bash}
+mkdir fastqc-brain/
+mkdir fastqc-brain/untrimmed/
+
+/home/shared/FastQC/fastqc \
+/home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/raw-data-brain/*.fastq \
+--outdir /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/fastqc-brain/untrimmed/ \
+--quiet
+
+```
+
+## RUN MULTIQC
+# gonad
 ```{bash}
 eval "$(/opt/anaconda/anaconda3/bin/conda shell.bash hook)"
 conda activate
 
-cd fastqc/untrimmed/
+cd fastqc-gonad/untrimmed/
 
 multiqc .
 ```
 
-# trim adapter sequences
+# liver
 ```{bash}
-mkdir trim-fastq/
-cd /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/raw-data/
+eval "$(/opt/anaconda/anaconda3/bin/conda shell.bash hook)"
+conda activate
+
+cd fastqc-liver/untrimmed/
+
+multiqc .
+```
+
+# brain
+```{bash}
+eval "$(/opt/anaconda/anaconda3/bin/conda shell.bash hook)"
+conda activate
+
+cd fastqc-brain/untrimmed/
+
+multiqc .
+```
+
+# trim adapter sequences - gonad
+```{bash}
+mkdir trim-fastq-gonad/
+cd /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/raw-data-gonad/
 
 for F in *.fastq
 do
@@ -111,14 +198,84 @@ results_file="$(basename -a $F)"
 
 # run cutadapt on each file
 /home/shared/8TB_HDD_02/mattgeorgephd/.local/bin/cutadapt $F -a A{8} -a G{8} -a AGATCGG -u 15 -m 20 -o \
-/home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/trim-fastq/$results_file
+/home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/trim-fastq-gonad/$results_file
 done
 ```
 
-# concatenate fastq files by lane
+
+# trim adapter sequences - liver
 ```{bash}
-mkdir merged-fastq
-cd trim-fastq/
+mkdir trim-fastq-liver/
+cd /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/raw-data-liver/
+
+for F in *.fastq
+do
+#strip .fastq and directory structure from each file, then
+# add suffice .trim to create output name for each file
+results_file="$(basename -a $F)"
+
+# -u 15 : hard trim first 15 bp
+# -m 20 : minimum length cutoff
+
+# run cutadapt on each file
+/home/shared/8TB_HDD_02/mattgeorgephd/.local/bin/cutadapt $F -a A{8} -a G{8} -a AGATCGG -u 15 -m 20 -o \
+/home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/trim-fastq-liver/$results_file
+done
+```
+
+# trim adapter sequences - brain
+```{bash}
+mkdir trim-fastq-brain/
+cd /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/raw-data-brain/
+
+for F in *.fastq
+do
+#strip .fastq and directory structure from each file, then
+# add suffice .trim to create output name for each file
+results_file="$(basename -a $F)"
+
+# -u 15 : hard trim first 15 bp
+# -m 20 : minimum length cutoff
+
+# run cutadapt on each file
+/home/shared/8TB_HDD_02/mattgeorgephd/.local/bin/cutadapt $F -a A{8} -a G{8} -a AGATCGG -u 15 -m 20 -o \
+/home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/trim-fastq-brain/$results_file
+done
+```
+
+# concatenate fastq files by lane - gonad
+```{bash}
+mkdir merged-fastq-gonad
+cd trim-fastq-gonad/
+
+printf '%s\n' *.fastq | sed 's/^\([^_]*_[^_]*\).*/\1/' | uniq |
+while read prefix; do
+    cat "$prefix"*R1*.fastq >"${prefix}_R1.fastq"
+    # cat "$prefix"*R2*.fastq >"${prefix}_R2.fastq" # include if more than one run
+done
+
+# I moved files to merged-fastq
+```
+
+
+# concatenate fastq files by lane - liver
+```{bash}
+mkdir merged-fastq-liver
+cd trim-fastq-liver/
+
+printf '%s\n' *.fastq | sed 's/^\([^_]*_[^_]*\).*/\1/' | uniq |
+while read prefix; do
+    cat "$prefix"*R1*.fastq >"${prefix}_R1.fastq"
+    # cat "$prefix"*R2*.fastq >"${prefix}_R2.fastq" # include if more than one run
+done
+
+# I moved files to merged-fastq
+```
+
+# concatenate fastq files by lane - brain
+```{bash}
+mkdir merged-fastq-brain
+cd trim-fastq-brain/
 
 printf '%s\n' *.fastq | sed 's/^\([^_]*_[^_]*\).*/\1/' | uniq |
 while read prefix; do
@@ -144,23 +301,55 @@ wc -l /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/merged-fastq/
 1472899016/1582147952*100
 ```
 
-# Run fastqc on trimmed files
+# Run fastqc on trimmed files - gonad
 ```{bash}
-mkdir fastqc/
-mkdir fastqc/trimmed/
+mkdir fastqc-gonad/
+mkdir fastqc-gonad/trimmed/
 
 /home/shared/FastQC/fastqc \
-/home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/merged-fastq/*.fastq \
---outdir /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/fastqc/trimmed/ \
+/home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/merged-fastq-gonad/*.fastq \
+--outdir /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/fastqc-gonad/trimmed/ \
 --quiet
 ```
 
-# Run multiqc on trimmed files
+# Run fastqc on trimmed files - liver
+```{bash}
+mkdir fastqc-liver/
+mkdir fastqc-liver/trimmed/
+
+/home/shared/FastQC/fastqc \
+/home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/merged-fastq-liver/*.fastq \
+--outdir /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/fastqc-liver/trimmed/ \
+--quiet
+```
+
+# Run fastqc on trimmed files - brain
+```{bash}
+mkdir fastqc-brain/
+mkdir fastqc-brain/trimmed/
+
+/home/shared/FastQC/fastqc \
+/home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/merged-fastq-brain/*.fastq \
+--outdir /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/fastqc-brain/trimmed/ \
+--quiet
+```
+
+# Run multiqc on trimmed files - gonad
 ```{bash}
 eval "$(/opt/anaconda/anaconda3/bin/conda shell.bash hook)"
 conda activate
 
-cd fastqc/trimmed/
+cd fastqc-gonad/trimmed/
+
+multiqc .
+```
+
+# Run multiqc on trimmed files - liver
+```{bash}
+eval "$(/opt/anaconda/anaconda3/bin/conda shell.bash hook)"
+conda activate
+
+cd fastqc-liver/trimmed/
 
 multiqc .
 ```
@@ -226,12 +415,12 @@ done
 
 ```
 
-# Run hisat2 on trimmed reads
+# Run hisat2 on trimmed reads - gonad
 ```{bash}
 
-mkdir hisat2_sam/
-mkdir hisat2_bam/
-cd /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/merged-fastq/
+mkdir hisat2_sam-gonad/
+mkdir hisat2_bam-gonad/
+cd /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/merged-fastq-gonad/
 
 # This script exports alignments as bam files
 # sorts the bam file because Stringtie takes a sorted file for input (--dta)
@@ -244,9 +433,36 @@ for i in ${array[@]}; do
 	  --dta \
 	  -x /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/sequences/hisat2_genome_index.fa \
 	  -U ${i} \
-	  -S /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_sam/${sample_name}.sam 
+	  -S /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_sam-gonad/${sample_name}.sam 
 	  
-	  /home/shared/samtools-1.12/samtools sort -@ 8 -o                /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_bam/${sample_name}.bam /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_sam/${sample_name}.sam
+	  /home/shared/samtools-1.12/samtools sort -@ 8 -o                /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_bam-gonad/${sample_name}.bam /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_sam-gonad/${sample_name}.sam
+    		echo "${i} bam-ified!"
+        # rm ${sample_name}.sam
+done >> hisat2out.txt 2>&1
+
+```
+
+# Run hisat2 on trimmed reads - liver
+```{bash}
+
+mkdir hisat2_sam-liver/
+mkdir hisat2_bam-liver/
+cd /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/merged-fastq-liver/
+
+# This script exports alignments as bam files
+# sorts the bam file because Stringtie takes a sorted file for input (--dta)
+# removes the sam file because it is no longer needed
+array=($(ls *.fastq)) # call the sequences - make an array to align
+for i in ${array[@]}; do
+       sample_name=`echo $i| awk -F [.] '{print $1}'`
+	/home/shared/hisat2-2.2.1/hisat2 \
+	  -p 16 \
+	  --dta \
+	  -x /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/sequences/hisat2_genome_index.fa \
+	  -U ${i} \
+	  -S /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_sam-liver/${sample_name}.sam 
+	  
+	  /home/shared/samtools-1.12/samtools sort -@ 8 -o                /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_bam-liver/${sample_name}.bam /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_sam-liver/${sample_name}.sam
     		echo "${i} bam-ified!"
         # rm ${sample_name}.sam
 done >> hisat2out.txt 2>&1
@@ -254,32 +470,49 @@ done >> hisat2out.txt 2>&1
 ```
 
 
+
 ```{bash}
 # check % alignment from hisat2
 
-grep "overall alignment rate" sequences/hisat2out.txt
+# grep "overall alignment rate" sequences/hisat2out-gonad.txt
 
-# 08/08/2022 - average alignment rate = 88.656 +/- 2.21 sd (w/ hard trim of first 15 bp)
+grep "overall alignment rate" sequences/hisat2out-liver.txt
+
+# 08/08/2022 - GONAD: average alignment rate = 88.656 +/- 2.21 sd (w/ hard trim of first 15 bp)
+# 10/18/2022 - LIVER: average alignment rate = 86.486 +/- 0.82 sd (w/ hard trim of first 15 bp)
 
 ```
 
-# Convert .sam files to .bam files, create bam indices
+# Convert .sam files to .bam files, create bam indices - Gonad
 ```{bash}
-mkdir hisat2_bam/
-cd hisat2_bam/
+mkdir hisat2_bam-gonad/
+cd hisat2_bam-gonad/
 
-for file in /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_sam/*.sam
+for file in /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_sam-gonad/*.sam
 do
 results_file="$(basename -a $file)_sorted.bam"
-/home/shared/samtools-1.12/samtools view -b $file | /home/shared/samtools-1.12/samtools sort -o /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_bam/$results_file
+/home/shared/samtools-1.12/samtools view -b $file | /home/shared/samtools-1.12/samtools sort -o /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_bam-gonad/$results_file
+done
+
+```
+
+# Convert .sam files to .bam files, create bam indices - liver
+```{bash}
+mkdir hisat2_bam-liver/
+cd hisat2_bam-liver/
+
+for file in /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_sam-liver/*.sam
+do
+results_file="$(basename -a $file)_sorted.bam"
+/home/shared/samtools-1.12/samtools view -b $file | /home/shared/samtools-1.12/samtools sort -o /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_bam-liver/$results_file
 done
 
 ```
 
 
-# Assemble hisat2 alignments w/ stringtie2 using mRNA genome feature track
+# Assemble hisat2 alignments w/ stringtie2 using mRNA genome feature track - gonad
 ```{bash}
-array=($(ls /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_bam/*.bam))
+array=($(ls /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_bam-gonad/*.bam))
 
 for i in ${array[@]}; do
         sample_name=`echo $i| awk -F [.] '{print $1}'`
@@ -296,13 +529,13 @@ done
 
 echo "StringTie assembly COMPLETE, starting assembly analysis" $(date)
 
-# 20220607 - I could not figure out how to designate the output. All outputs ended up in bowtie output folder.
+# 20220607 - I could not figure out how to designate the output. All outputs ended up in hisat2 output folder.
 
 ```
 
 ```{bash}
 
-cd /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_bam
+cd /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_bam-gonad
 
 # make gtf list file (needed for stringtie merge function)
 for filename in *.gtf; do 
@@ -334,5 +567,74 @@ echo "Stringtie merge complete" $(date)
 
 echo "Gene count matrix compiled." $(date)
 
+```
+
+
+# Assemble hisat2 alignments w/ stringtie2 using mRNA genome feature track - liver
+```{bash}
+array=($(ls /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_bam-liver/*.bam))
+
+for i in ${array[@]}; do
+        sample_name=`echo $i| awk -F [.] '{print $1}'`
+	      /home/shared/stringtie-2.2.1.Linux_x86_64/stringtie \
+	      -p 48 \
+	      -e \
+	      -B \
+	      -G /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/sequences/GCF_006149115.2_Oner_1.1_mRNA.gff \
+	      -A ${sample_name}.gene_abund.tab \
+	      -o ${sample_name}.gtf ${i} \
+
+        echo "StringTie assembly for seq file ${i}" $(date)
+done
+
+echo "StringTie assembly COMPLETE, starting assembly analysis" $(date)
+
+# 20220607 - I could not figure out how to designate the output. All outputs ended up in hisat2 output folder.
+
+```
+
+```{bash}
+
+cd /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/hisat2_bam-liver
+
+# make gtf list file (needed for stringtie merge function)
+for filename in *.gtf; do 
+  echo $PWD/$filename; 
+  done > gtf_list.txt
+
+# make listGTF file (needed for count matrix), two columns w/ sample ID
+for filename in *.gtf; do 
+  echo $filename $PWD/$filename; 
+  done > listGTF.txt
+
+# merge GTFs into a single file
+/home/shared/stringtie-2.2.1.Linux_x86_64/stringtie \
+  --merge \
+  -p 48 \
+	-G /home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon/sequences/GCF_006149115.2_Oner_1.1_mRNA.gff \
+	-o onerka_merged.gtf gtf_list.txt #Merge GTFs to form $
+
+echo "Stringtie merge complete" $(date)
+
+# Compute accuracy of gff
+# gffcompare -r ../../../refs/Panopea-generosa-v1.0.a4.mRNA_SJG.gff3 -G -o merged Pgenerosa_merged.gtf #Compute the accuracy and pre$
+# echo "GFFcompare complete, Starting gene count matrix assembly..." $(date)
+
+# Compile gene count matrix from GTFs
+/home/shared/stringtie-2.2.1.Linux_x86_64/prepDE.py \
+  -g onerka_gene_count_matrix.csv \
+  -i listGTF.txt #Compile the gene count matrix
+
+echo "Gene count matrix compiled." $(date)
+
+```
+
+
+
+
+
+```{bash}
+cd sequences
+awk -F "\t" '$1 == "mRNA" {print $15, "\t", $14}' GCF_006149115.2_Oner_1.1_feature_table.txt > x.txt
 ```
 
