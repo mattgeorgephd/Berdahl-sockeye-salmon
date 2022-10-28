@@ -1,0 +1,8 @@
+"0",""
+"0","ggsave(""DESEQ_output/liver/Volcano_all_genes_normal.png"","
+"0","       plot   = p2,"
+"0","       dpi    = 600,"
+"0","       device = ""png"","
+"0","       width  = 6,"
+"0","       height = 4,"
+"0","       units  = ""in"")"

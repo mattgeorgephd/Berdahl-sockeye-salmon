@@ -1,0 +1,19 @@
+"0","awk '$0 ~ "">"" {print c; c=0;printf substr($0,2,14) ""\t""; } $0 !~ "">"" {c+=length($0);} END { print c; }' \
+sequences/GCF_006149115.2_Oner_1.1_genomic.fna \
+| sed 's/Cr//g' \
+| awk '{print $1""\t""$3}' \
+| tail -n +2 \
+> sequences/GCF_006149115.2_Oner_1.1_genomic-sequence-lengths.txt
+
+head sequences/GCF_006149115.2_Oner_1.1_genomic-sequence-lengths.txt"
+"1","NC_042535.1	41065921
+NC_042536.1	61175412
+NC_042537.1	59001101
+NC_042538.1	63915030
+NC_042539.1	37979840
+NC_042540.1	54634741
+NC_042541.1	58386872
+NC_042542.1	35046503
+NC_042543.1	47832342
+NC_042544.1	68883746
+"

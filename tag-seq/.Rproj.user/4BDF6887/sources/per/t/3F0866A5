@@ -1,0 +1,27 @@
+{
+    "id": "3F0866A5",
+    "path": "C:/Users/mattg/Dropbox/UW/Postdoc/2022_Berdahl_sockeye_salmon/Berdahl-sockeye-salmon/tag-seq/code/3_generate_gene_tables-salmon.Rmd",
+    "project_path": "code/3_generate_gene_tables-salmon.Rmd",
+    "type": "r_markdown",
+    "hash": "2700112273",
+    "contents": "",
+    "dirty": false,
+    "created": 1666287145524.0,
+    "source_on_save": false,
+    "relative_order": 4,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "66,51",
+        "scrollLine": "0",
+        "last_setup_crc32": ""
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1666287790,
+    "encoding": "ISO8859-1",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1666294150143,
+    "read_only": false,
+    "read_only_alternatives": []
+}

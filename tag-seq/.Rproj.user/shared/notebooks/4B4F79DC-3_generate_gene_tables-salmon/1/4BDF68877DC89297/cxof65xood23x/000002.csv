@@ -1,0 +1,22 @@
+"0","head sequences/GCF_006149115.2_Oner_1.1_genomic.gff
+
+grep -e ""Gnomon	mRNA"" -e ""RefSeq	mRNA"" -e ""cmsearch	mRNA"" -e ""tRNAscan-SE	mRNA"" \
+sequences/GCF_006149115.2_Oner_1.1_genomic.gff \
+| /home/shared/bedtools2/bin/sortBed \
+-faidx sequences/GCF_006149115.2_Oner_1.1_genomic-sequence-lengths.txt \
+> sequences/GCF_006149115.2_Oner_1.1_mRNA.gff
+
+head sequences/GCF_006149115.2_Oner_1.1_mRNA.gff"
+"1","##gff-version 3
+#!gff-spec-version 1.21
+#!processor NCBI annotwriter
+#!genome-build Oner_1.1
+#!genome-build-accession NCBI_Assembly:GCF_006149115.2
+#!annotation-source NCBI Oncorhynchus nerka Annotation Release 100
+##sequence-region NC_042535.1 1 41065921
+##species https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=8023
+NC_042535.1	RefSeq	region	1	41065921	.	+	.	ID=NC_042535.1:1..41065921;Dbxref=taxon:8023;Name=LG1;country=Canada: Pitt Lake%2C BC;dev-stage=fry;gbkey=Src;genome=chromosome;genotype=Doubled Haploid;isolate=On170113-E2;linkage-group=LG1;mol_type=genomic DNA;sex=female;tissue-type=Caudal fin
+NC_042535.1	Gnomon	gene	41325	80838	.	-	.	ID=gene-tmtc4;Dbxref=GeneID:115130657;Name=tmtc4;gbkey=Gene;gene=tmtc4;gene_biotype=protein_coding
+"
+"2","/mnt/c/Users/mattg/AppData/Local/Temp/RtmpCCdidg/chunk-code-ae201074719a.txt: line 6: /home/shared/bedtools2/bin/sortBed: No such file or directory
+"

@@ -1,0 +1,4 @@
+"0","# Significant Genes"
+"0","p5 <- ggplot(sig_genes, aes(x = log2FoldChange, y = -log10(pvalue))) +"
+"0","             geom_point(aes(color=log2FoldChange>0))"
+"0","p5"

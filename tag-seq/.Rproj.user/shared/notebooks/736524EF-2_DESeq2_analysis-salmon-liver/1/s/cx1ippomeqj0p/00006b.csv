@@ -1,0 +1,8 @@
+"0",""
+"0","setwd(""DESEQ_output/liver"")"
+"2","Warning: The working directory was changed to C:/Users/mattg/Dropbox/UW/Postdoc/2022_Berdahl_sockeye_salmon/Berdahl-sockeye-salmon/tag-seq/DESEQ_output/liver inside a notebook chunk. The working directory will be reset when the chunk is finished running. Use the knitr root.dir option in the setup chunk to change the working directory for notebook chunks."
+"0","ggexport(filename = ""liver-PCA.png"","
+"0","         plot   = bp1,"
+"0","         res    = 600,"
+"0","         # device = ""png"","
+"0","         height = 5000)"

@@ -1,0 +1,6 @@
+"0",""
+"0","# Load LOCID to gene description tables, compare, find gigas and mito genes"
+"0","liver <- read.delim(""../DESEQ_output/liver/liver-SIG-DEG-apeglm.csv"", sep = "" "", header = TRUE)"
+"2","Warning: cannot open file '../DESEQ_output/liver/liver-SIG-DEG-apeglm.csv': No such file or directory"
+"2","Error in file(file, ""rt"") : cannot open the connection
+"

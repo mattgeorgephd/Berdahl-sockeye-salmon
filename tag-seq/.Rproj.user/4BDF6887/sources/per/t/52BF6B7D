@@ -1,0 +1,27 @@
+{
+    "id": "52BF6B7D",
+    "path": "C:/Users/mattg/Dropbox/UW/Postdoc/2022_Berdahl_sockeye_salmon/Berdahl-sockeye-salmon/tag-seq/code/2_DESeq2_analysis-salmon-gonad.Rmd",
+    "project_path": "code/2_DESeq2_analysis-salmon-gonad.Rmd",
+    "type": "r_markdown",
+    "hash": "1331036941",
+    "contents": "",
+    "dirty": false,
+    "created": 1666244260370.0,
+    "source_on_save": false,
+    "relative_order": 2,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "last_setup_crc32": "",
+        "cursorPosition": "5,0",
+        "scrollLine": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1666288718,
+    "encoding": "ISO8859-1",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1666288718573,
+    "read_only": false,
+    "read_only_alternatives": []
+}

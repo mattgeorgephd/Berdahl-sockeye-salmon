@@ -1,0 +1,7 @@
+"0",""
+"0","setwd(""DESEQ_output/gonad"")"
+"0","ggexport(filename = ""GONAD-PCA.png"","
+"0","         plot   = bp1,"
+"0","         # device = ""png"","
+"0","         width  = 4000,"
+"0","         height = 5000)"

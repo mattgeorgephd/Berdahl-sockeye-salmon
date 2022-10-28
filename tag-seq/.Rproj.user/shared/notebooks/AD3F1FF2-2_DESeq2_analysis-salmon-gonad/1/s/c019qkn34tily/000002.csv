@@ -1,0 +1,8 @@
+"0","
+cd DESEQ_output
+
+# samples included _ variable analyzed (when 1 specified, compared to control)
+mkdir gonad
+"
+"2","mkdir: cannot create directory 'gonad': File exists
+"

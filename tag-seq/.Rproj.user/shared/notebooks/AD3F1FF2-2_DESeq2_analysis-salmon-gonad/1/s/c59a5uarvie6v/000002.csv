@@ -1,0 +1,12 @@
+"0","cd genome
+# awk -F ""\t"" '$1 == ""mRNA"" {print $15, ""\t"", $14}' GCF_006149115.2_Oner_1.1_feature_table.txt > Onerka_LOCID_gene_table.txt
+# This worked, but I had to mannually remove an extra space after the LOCID for left_join to work later --> saved to gannet, just grab it there
+
+wget -r \
+--no-directories --no-parent \
+-P . \
+-A Onerka_LOCID_gene_table.txt https://gannet.fish.washington.edu/panopea/berdahl-sockeye-salmon/genome/ \
+--no-check-certificate
+"
+"2","/c/Users/mattg/AppData/Local/Temp/RtmpUpfctn/chunk-code-f647c649c9.txt: line 5: wget: command not found
+"

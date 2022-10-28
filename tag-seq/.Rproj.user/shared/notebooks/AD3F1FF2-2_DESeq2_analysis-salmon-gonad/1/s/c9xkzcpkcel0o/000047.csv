@@ -1,0 +1,6 @@
+"0",""
+"0","# Plot pheatmap"
+"0","rld <- rlog(dds, blind=T)"
+"0","rld_mat <- assay(rld)"
+"0","rld_cor <- cor(rld_mat)"
+"0","bp3 <- pheatmap(rld_cor, annotation = coldata_trt[,1:2])"

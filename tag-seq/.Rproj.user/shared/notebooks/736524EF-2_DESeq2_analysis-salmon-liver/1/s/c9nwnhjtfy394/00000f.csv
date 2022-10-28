@@ -1,0 +1,5 @@
+"0","# Volcano plots"
+"0","# All genes"
+"0","p1 <- ggplot(all_genes, aes(x = log2FoldChange, y = -log10(pvalue))) +"
+"0","             geom_point(aes(color=log2FoldChange>0))"
+"0","p1"
