@@ -63,6 +63,9 @@ rendered or read by the analysis.
 
 For the full audit and the remaining work, see `REPRODUCIBILITY-PLAN.md`.
 
+What still stands between this repository and a *Molecular Ecology* submission
+is tracked in `SUBMISSION-CHECKLIST.md`.
+
 ---
 
 ### Locations
