@@ -222,7 +222,101 @@ heatmap colour legend, and is produced by no script (`figures/README.md`).
 
 ---
 
-## D. Housekeeping
+## D. Repository streamlining (do before the Zenodo release)
+
+Added 2026-09-26 after a second pass over the repository layout. The
+scaffolding — one entry point, numbered notebooks, tracked and checksummed
+results, CI — is right. What follows is what a reviewer would meet on arrival
+that gets in the way. Items D1 and D2 regenerate every result table, so do
+them in the same pass as B1 and rebaseline `check-reproduction.R` once.
+
+### D1. Naming that will confuse supplementary-table readers
+
+- [ ] Use one case for the per-tissue output prefixes (`liver-*` and
+      `GONAD-*` today; `tissue_config()` in `tag-seq/code/_common.R`).
+- [ ] Rename the `treatment` column in the DE tables, which holds the tissue
+      name (`annotate_genes()` in notebook 02), to `tissue`.
+- [ ] Rename the `DEGs_all-genes*` rows of `*-gene-counts.csv` to say
+      "genes tested"; they are not DEG counts.
+- [ ] Rename `trt` to `phenotype` in `tag-seq/data/treatments-*.csv`, the
+      DESeq2 design and the plots, and re-record the input checksums.
+
+### D2. Track only the results the manuscript uses
+
+`tag-seq/DESEQ_output/` holds 53 files and 44 MB: four shrinkage estimators,
+each with all-genes, significant and per-gene-count tables, plus eight volcano
+PNGs and two MA-plot formats per tissue. The manuscript uses apeglm only.
+
+- [ ] Keep the unshrunken and apeglm tables, the gene-count summary, the PCA,
+      correlation heatmap and one volcano and heatmap per tissue.
+- [ ] Either stop writing the `normal` and `ashr` tables and the per-estimator
+      single-gene-count tables, or write them to an untracked `alternatives/`
+      subfolder. Say in notebook 02 that the estimators were compared and the
+      significant sets were identical.
+- [ ] Drop the duplicate MA-plot format and the per-estimator volcano PNGs.
+- [ ] Rebaseline `check-reproduction.R` on the reduced set.
+
+### D3. Move the inputs nothing reads
+
+Already recorded as open decisions in `tag-seq/data/README.md` and
+`tag-seq/genome/README.md`; close them.
+
+- [ ] Move `transcript_count_matrix-{gonad,liver}.csv` and
+      `onerka_merged-liver.gtf` (33 MB) to the Gannet project folder or into
+      the SRA/GEO deposit, and record the URL in `tag-seq/data/README.md`.
+- [ ] Drop `Onerka_LOCID_gene_table.txt` (3.8 MB, superseded) and record in
+      `tag-seq/genome/README.md` that the feature table is a strict superset.
+- [ ] Tracked content then falls from ~129 MB to ~55 MB. Git history keeps the
+      old blobs; that is fine, Zenodo archives the tree.
+
+### D4. Write the notebooks for a reader, not an auditor
+
+The notebooks, the directory READMEs and `_common.R` carry the audit narrative
+("finding R5", "replaces the .Rmd which…", what the 2023 code did wrong). That
+record belongs in `REPRODUCIBILITY-PLAN.md`, which already holds it.
+
+- [ ] Rewrite the prose in notebooks 02–04 and `_common.R` to describe the
+      analysis as it is; move each "finding" reference and each comparison
+      with the deleted code into the plan document, keyed by finding number.
+- [ ] Same for `tag-seq/data/README.md`, `tag-seq/genome/README.md`,
+      `tag-seq/sequences/README.md` and `figures/README.md`.
+- [ ] Remove the callouts in `index.qmd` that mark the gonad counts as
+      provisional and the raw data as undeposited — by resolving A3 and A5,
+      not by deleting the text.
+
+### D5. Empty directories and lab logistics
+
+- [ ] `tag-seq/QC/`: commit the MultiQC reports and a per-sample alignment
+      table (A5), or remove the placeholder directories. An empty tracked
+      directory asserts content that is not there.
+- [ ] Move the sequencing logistics in `README.md` (shipping dates, GSAF
+      quote, sample manifest, Dropbox links, GitHub issue links) to a
+      `NOTES.md` or drop them from the public archive. Keep the Gannet URL.
+- [ ] Add a directory map to `README.md`: one line per top-level directory
+      saying what it holds and which notebook reads or writes it.
+
+### D6. Figures and supplement as outputs
+
+- [ ] Replace `figures/figure_X.pptx` and its PNG export with the output of
+      the figures notebook (C2). Delete the pptx once the scripted figure
+      matches.
+- [ ] Have the same notebook write `manuscript/supplementary/` (tables S1–Sn
+      from A5, B3, C3) so the supplement is regenerated with the results.
+- [ ] Add `manuscript/manuscript.qmd` to `render-all.sh` and to the render
+      workflow (C4) so the docx and the supplement are built in CI.
+
+### D7. Standard files
+
+- [ ] `LICENSE` (A4).
+- [ ] `CITATION.cff` (A4).
+- [ ] `tag-seq/` is an extra directory level left from when the repository
+      held other work. Flattening it touches every path and every committed
+      result location; do it only if the results are being regenerated anyway
+      for B1 and D1–D2, and otherwise leave it.
+
+---
+
+## E. Housekeeping
 
 - [ ] `project-sockeye-tagseq.Rproj` has an uncommitted `ProjectId` line added
       by RStudio; commit or discard.
