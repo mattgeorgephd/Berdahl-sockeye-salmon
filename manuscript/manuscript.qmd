@@ -1,0 +1,545 @@
+---
+title: "Gonadal but not hepatic transcriptomes distinguish territorial from social sockeye salmon (*Oncorhynchus nerka*)"
+author:
+  - name: "[[Author list to be completed]]"
+    affiliations:
+      - "School of Aquatic and Fishery Sciences, University of Washington, Seattle, WA, USA"
+date: today
+abstract: |
+  Social phenotype shapes physiology across vertebrates, but in wild salmonids the
+  molecular correlates of behavioural type have been studied almost exclusively in
+  the brain. We used 3′-tag RNA sequencing (TagSeq) to compare gonad and liver
+  transcriptomes of adult sockeye salmon classified in the field as territorial or
+  social (n = 15 per phenotype, two tissues per fish). Gonadal expression differed
+  markedly between phenotypes: 1,630 of 18,935 tested genes were
+  differentially expressed (adjusted p < 0.05), 79% of them more highly
+  expressed in territorial fish. Over-representation analysis of these genes recovered
+  a coherent programme of elevated protein synthesis and energy production, led by
+  ribosome and oxidative phosphorylation pathways (6 KEGG pathways and
+  35 GO terms at FDR < 0.05), alongside strong induction of acute-phase
+  and stress-response genes including two serum amyloid A paralogues and a small heat
+  shock protein. By contrast the liver was nearly indistinguishable between
+  phenotypes, with 31 differentially expressed genes of 5,646
+  tested and no enriched pathway. Expression of sex-linked marker genes indicated that
+  all gonad samples were ovarian. The results point to the gonad, rather than the
+  liver, as the peripheral tissue in which the territorial phenotype of adult sockeye
+  is physiologically expressed, and are consistent with territorial females being in
+  a more active state of reproductive investment. Because behaviour was scored at
+  capture in a cross-sectional design, the direction of causation between behavioural
+  type and gonadal state cannot be resolved here. All analyses are fully scripted,
+  version-pinned, and re-executed on an independent machine as part of a continuous
+  integration check that reproduces every reported number.
+keywords: [sockeye salmon, social behaviour, territoriality, TagSeq, gonad, liver, transcriptomics, oxidative phosphorylation]
+bibliography: references.bib
+link-citations: true
+number-sections: true
+execute:
+  echo: false
+  warning: false
+  message: false
+format:
+  html:
+    toc: true
+    embed-resources: true
+  docx:
+    toc: false
+    number-sections: true
+---
+
+```{r}
+#| label: setup
+#| include: false
+suppressPackageStartupMessages({ library(dplyr); library(knitr) })
+## Resolve the project root (the directory holding _quarto.yml) so this document
+## renders identically whether Quarto executes it from the project root or from
+## manuscript/. All data paths below are relative to that root.
+root <- normalizePath(getwd())
+while (!file.exists(file.path(root, "_quarto.yml")) && dirname(root) != root) root <- dirname(root)
+setwd(root)
+knitr::opts_knit$set(root.dir = root)
+source("tag-seq/code/_common.R")
+
+fmt <- function(x) format(x, big.mark = ",", trim = TRUE)
+pct <- function(a, b, d = 0) paste0(formatC(100 * a / b, format = "f", digits = d), "%")
+sci <- function(p) {
+  if (p >= 0.001) return(formatC(p, format = "f", digits = 3))
+  e <- floor(log10(p)); m <- p / 10^e
+  sprintf("%.1f &times; 10^%d^", m, e)   # HTML entity: R's sprintf mangles non-ASCII under a C locale
+}
+
+read_tissue <- function(tissue) {
+  cfg <- tissue_config(tissue)
+  list(
+    all = read.csv(out_path(cfg, cfg$prefix, "-ALL-DEG-apeglm.csv"), stringsAsFactors = FALSE),
+    sig = read.csv(out_path(cfg, cfg$prefix, "-SIG-DEG-apeglm.csv"), stringsAsFactors = FALSE),
+    counts = read.csv(out_path(cfg, cfg$prefix, "-gene-counts.csv"), row.names = 1),
+    go  = read.csv(file.path("tag-seq/GO_output", tissue, paste0(tissue, "-GO-all.csv")), stringsAsFactors = FALSE),
+    kegg = read.csv(file.path("tag-seq/GO_output", tissue, paste0(tissue, "-KEGG-all.csv")), stringsAsFactors = FALSE)
+  )
+}
+L <- read_tissue("liver"); G <- read_tissue("gonad")
+
+l_tested <- nrow(L$all); l_sig <- nrow(L$sig); l_up <- sum(L$sig$log2FoldChange > 0); l_down <- l_sig - l_up
+g_tested <- nrow(G$all); g_sig <- nrow(G$sig); g_up <- sum(G$sig$log2FoldChange > 0); g_down <- g_sig - g_up
+l_kept <- L$counts["genes_after_filtering", "count"]; g_kept <- G$counts["genes_after_filtering", "count"]
+n_genes <- L$counts["genes_before_filtering", "count"]
+g_lfc1 <- sum(abs(G$sig$log2FoldChange) > 1)
+g_medlfc <- median(abs(G$sig$log2FoldChange)); l_medlfc <- median(abs(L$sig$log2FoldChange))
+shared <- intersect(L$sig$gene, G$sig$gene)
+
+go_sig  <- sum(G$go$FDR  < 0.05);  k_sig  <- sum(G$kegg$FDR < 0.05)
+lgo_sig <- sum(L$go$FDR  < 0.05);  lk_sig <- sum(L$kegg$FDR < 0.05)
+oxphos <- G$kegg[G$kegg$category == "one00190", ]
+ribo   <- G$kegg[G$kegg$category == "one03010", ]
+
+## Library depth from the count matrices themselves.
+depth <- sapply(c("liver", "gonad"), function(t) colSums(load_counts(tissue_config(t))$cts))
+depth_txt <- function(t) sprintf("%.1f &plusmn; %.1f million", mean(depth[[t]]) / 1e6, sd(depth[[t]]) / 1e6)
+
+## Direction of DE genes within the enriched KEGG pathways.
+ann <- load_gene_annotation()
+g2g <- setNames(ann$gene, as.character(ann$GeneID))
+kl <- read.delim(file.path(PATHS$genome, "kegg_one_gene2pathway.tsv"), header = FALSE, col.names = c("gene", "pathway"))
+kl$gene <- unname(g2g[sub("^one:", "", kl$gene)]); kl$pathway <- sub("^path:", "", kl$pathway)
+pw_dir <- function(pw) { g <- G$sig[G$sig$gene %in% kl$gene[kl$pathway == pw], ]; c(n = nrow(g), up = sum(g$log2FoldChange > 0)) }
+ox_dir <- pw_dir("one00190"); ribo_dir <- pw_dir("one03010")
+
+## Length association (the reason the hypergeometric test is used).
+len <- setNames(ann$length, ann$gene)
+dec <- G$all %>% filter(gene %in% names(len)) %>% mutate(len = len[gene], de = padj < 0.05, decile = ntile(len, 10)) %>%
+  group_by(decile) %>% summarise(pctDE = 100 * mean(de), .groups = "drop")
+dec1 <- dec$pctDE[1]; dec_rest <- range(dec$pctDE[-1])
+
+## Gene tables
+gene_tbl <- function(sig, n = NULL, by = c("padj", "lfc")) {
+  by <- match.arg(by)
+  x <- if (by == "padj") sig %>% arrange(padj) else sig %>% arrange(desc(abs(log2FoldChange)))
+  if (!is.null(n)) x <- head(x, n)
+  x %>% transmute(Gene = gene, Description = description,
+                  `log2 fold change` = formatC(log2FoldChange, format = "f", digits = 2),
+                  `Adjusted p` = sapply(padj, sci))
+}
+```
+
+# Introduction
+
+Social behaviour is among the most conspicuous sources of phenotypic variation in
+salmonid fishes. As juveniles in streams, individuals defend feeding territories and
+form dominance hierarchies in which rank predicts growth, metabolic rate and
+life-history trajectory [@Metcalfe1995; @Cutts2002; @Reid2011; @Gilmour2005]. As
+adults, the same species migrate and move in aggregations whose collective
+properties can improve navigation and passage past obstacles [@Berdahl2014;
+@Okasaki2020], and then, on the spawning grounds, revert to intense intra-sexual
+competition in which males contest access to females and females contest and defend
+nest sites [@Quinn1999; @Fleming1998]. The energetic cost of these behaviours is
+substantial: aggressive display and nest defence are the most expensive activities in
+the daily budget of spawning Pacific salmon after simple holding [@McVeigh2007].
+Whether an individual behaves territorially or remains within a social aggregation is
+therefore a decision with physiological consequences, but the tissue-level molecular
+correlates of that decision in wild adult salmon are largely unknown.
+
+Transcriptomic studies of social phenotype in fish have concentrated on the brain.
+Dominant and subordinate individuals differ in neural gene expression in cichlids
+[@Renn2008; @Renn2016], zebrafish [@Filby2010], weakly electric fish [@Eastman2020]
+and juvenile Atlantic salmon [@Roberge2008]. Fewer studies have asked how social
+phenotype is reflected in peripheral tissues, yet the evidence that exists suggests
+the effects can be as large as those in the brain. In Nile tilapia, dominance is
+coupled to gonadotropin signalling, sex-steroid levels and testis transcription
+[@Thonnes2022; @HollanderCohen2022]; in juvenile rainbow trout, four days of
+subordination reorganise hepatic lipid metabolism [@Kostyniuk2018]; and in mammals,
+social status remodels immune gene regulation in blood, liver and spleen
+[@SnyderMackler2016; @Lee2022]. The gonad and the liver are natural targets in
+salmon: the gonad because behaviour on the spawning grounds is inseparable from
+reproductive state, and the liver because it integrates energy allocation and
+synthesises the plasma proteins, including vitellogenin and acute-phase reactants,
+that mediate the costs of competition.
+
+Here we compare gonad and liver transcriptomes of adult sockeye salmon
+(*Oncorhynchus nerka*) classified at capture as territorial or social. We used
+3′-tag RNA sequencing (TagSeq), which counts one fragment per transcript and
+therefore quantifies expression at a fraction of the cost of whole-transcript
+RNA-seq without the transcript-length bias that complicates downstream inference
+[@Meyer2011; @Lohman2016; @Moll2014]. We asked (i) whether the two behavioural
+phenotypes differ in gene expression in either tissue, (ii) which biological
+processes distinguish them, and (iii) whether the two tissues carry a shared
+signature. We find that the gonad, not the liver, carries the phenotype.
+
+# Materials and methods
+
+## Animals and sampling
+
+**[[To be completed by the authors: collection site(s) and dates; how fish were
+identified as territorial or social, including the behavioural criteria and
+observation period; sex determination and maturity staging at dissection; body size;
+permits and animal-care approval.]]** Thirty adult sockeye salmon were sampled, 15
+classified as territorial and 15 as social. Liver, gonad, brain and blood were
+dissected from each individual, preserved in RNAlater, and stored at −80 °C on return
+to the laboratory. Only liver and gonad were sequenced; brain RNA yields were
+insufficient.
+
+## RNA isolation
+
+Approximately 20 mg of tissue was homogenised in 1 ml RNAzol RT (Molecular Research
+Center, Cincinnati, OH) and total RNA was purified with the Direct-zol RNA Microprep
+kit (Zymo Research, Irvine, CA) including the on-column DNase I step. RNA was
+quantified by fluorometry (Qubit 3.0, Life Technologies) and integrity was checked on
+a subset of samples from each extraction batch on an Agilent 2100 Bioanalyzer; all
+checked samples had RNA integrity numbers above 7.
+
+## Library preparation and sequencing
+
+Libraries were prepared and sequenced at the Genomic Sequencing and Analysis
+Facility, University of Texas at Austin, using the QuantSeq 3′ mRNA-Seq FWD protocol
+(Lexogen, Vienna, Austria), a commercial implementation of TagSeq [@Moll2014;
+@Lohman2016]. The method generates a single cDNA fragment from the 3′ end of each
+polyadenylated transcript, so tag counts are direct proxies for transcript abundance
+and are independent of transcript length [@Meyer2011]. Single-end reads were
+sequenced **[[platform and read length to be confirmed]]** in two submissions
+(gonad, GSAF job JA22192; liver, JA22330).
+
+## Read processing and quantification
+
+Reads were trimmed with cutadapt [@Martin2011]: the first 15 bases were removed to
+eliminate the random priming barcode, poly-A and poly-G runs of eight or more bases
+and the Illumina adapter (AGATCGG) were trimmed, and reads shorter than 20 bases were
+discarded. Quality was assessed before and after trimming with FastQC and MultiQC
+[@Ewels2016]. Trimmed reads were aligned to the sockeye salmon reference assembly
+GCF_006149115.2 (Oner_1.1) [@Christensen2020] with HISAT2 v2.2.1 [@Kim2019] using
+`--dta` and a relaxed score minimum (`--score-min L,0,-0.6`), and alignments were
+sorted with samtools v1.12. Transcripts were assembled per sample against the RefSeq
+mRNA annotation with StringTie v2.2.1 [@Pertea2015; @Kovaka2019], merged per tissue,
+and gene-level counts were extracted with prepDE.py. Mean overall alignment rates
+were 88.7% (SD 2.2) for gonad and 86.5% (SD 0.8) for liver libraries. Two gonad
+samples (C05 and C17) clustered apart from all others in the sample-correlation
+heatmap and were excluded before modelling, leaving 28 gonad and 30 liver libraries.
+
+## Differential expression
+
+Gene counts were analysed in R 4.3.2 with DESeq2 v1.42.1 [@Love2014] separately for
+each tissue, with behavioural phenotype as the single factor and *social* as the
+reference level, so that positive fold changes denote higher expression in
+territorial fish. Samples were matched between the count matrix and the phenotype
+table by identifier and the match was asserted programmatically. Dispersions and
+size factors were estimated on the full matrix of `r fmt(n_genes)` annotated genes;
+for reporting, genes were retained if they had at least 10 counts in at least a third
+of the samples (`r fmt(l_kept)` liver and `r fmt(g_kept)` gonad genes). The Wald test
+p-values were adjusted for multiple testing with the Benjamini–Hochberg procedure
+[@Benjamini1995] after DESeq2's independent filtering, and log~2~ fold changes were
+shrunk with the apeglm estimator [@Zhu2019]. Genes with an adjusted p below 0.05 were
+considered differentially expressed. Ordination used principal component analysis of
+variance-stabilised counts; sample clustering used Pearson correlation of
+regularised-log counts.
+
+## Functional enrichment
+
+Gene Ontology (GO) annotations were taken from the NCBI annotation release for this
+assembly (GAF 2.2, 139,236 distinct gene–term pairs after removing NOT-qualified
+annotations, covering 32,629 genes and 6,937 terms), and KEGG pathway membership from
+the KEGG REST service for organism `one` (12,285 genes in 196 pathways); both were
+vendored into the repository with their retrieval dates. For each tissue the test
+universe was every gene that received an adjusted p-value, and the differentially
+expressed set was those with adjusted p below 0.05, the same rule used for the
+results tables. Over-representation was tested with the hypergeometric test as
+implemented in goseq [@Young2010] and corrected across tested categories by
+Benjamini–Hochberg. We did not use goseq's default Wallenius test, which re-weights
+genes by transcript length, for two reasons. First, TagSeq counts one fragment per
+transcript, so the length-dependent power that the weighting is designed to remove is
+absent by construction. Second, the relationship between length and differential
+expression in these data runs the other way: in the gonad, `r formatC(dec1, format = "f", digits = 0)`%
+of genes in the shortest length decile were differentially expressed against
+`r formatC(dec_rest[1], format = "f", digits = 0)`–`r formatC(dec_rest[2], format = "f", digits = 0)`% in every
+other decile, so the Wallenius weighting selectively suppressed the short-gene
+pathways that constitute the biological signal, and its spline fit proved sensitive
+to computing platform. The hypergeometric test is exact and deterministic.
+
+## Reproducibility
+
+Every result reported here is produced by rendering the Quarto notebooks in the
+project repository, with R package versions pinned in a renv lockfile against a dated
+CRAN snapshot and Bioconductor 3.18. Input files are checksummed and verified at the
+start of each render. A GitHub Actions workflow restores the environment on a clean
+Ubuntu runner, re-renders the analysis end to end, and fails if any result table
+changes in rows, columns or significance calls at 0.05; the tables reported below have
+passed that check. The manuscript itself is a Quarto document whose numbers are read
+from the committed result tables at render time.
+
+# Results
+
+## Sequencing and sample quality
+
+Libraries yielded `r depth_txt("gonad")` gene-assigned counts per gonad sample and
+`r depth_txt("liver")` per liver sample (mean ± SD). Of the `r fmt(n_genes)`
+annotated genes, `r fmt(g_kept)` (gonad) and `r fmt(l_kept)` (liver) passed the
+minimum-count filter, and `r fmt(g_tested)` and `r fmt(l_tested)` respectively
+received an adjusted p-value after independent filtering. Expression of sex-linked
+marker genes was uniform across gonad samples: forkhead box L2 paralogues were highly
+expressed in every sample (112–410 counts per million), zona pellucida genes were
+expressed in all, and the testis markers *dmrt1* and *amh* were low throughout,
+indicating that all 28 gonad libraries were ovarian **[[to be confirmed against
+dissection records]]**. Zona pellucida transcript abundance varied more than
+100-fold among fish, consistent with heterogeneity in oocyte developmental stage.
+
+## Global expression structure
+
+Neither tissue separated cleanly by phenotype in unsupervised ordination
+(@fig-overview A, D). In the liver the first two principal components explained
+13.8% and 10.9% of variance and the phenotype groups overlapped almost completely. In
+the gonad the first component explained 21.4% of variance and territorial samples
+were spread along it, with roughly half forming a cluster at negative PC1 scores
+that contained no social fish, while the remainder overlapped the social group. The
+gonad sample-correlation matrix showed the same structure: a block of six
+territorial fish (C01, C06, C07, C08, C10, C11) correlated more strongly with one
+another than with any social sample. Phenotype thus accounts for part, but not the
+majority, of transcriptome-wide variation in either tissue.
+
+## Liver
+
+Only `r fmt(l_sig)` of `r fmt(l_tested)` tested liver genes differed between
+phenotypes at an adjusted p below 0.05 (@fig-overview B, C; @tbl-liver), and fold
+changes were modest (median |log~2~ fold change| `r formatC(l_medlfc, format = "f", digits = 2)`;
+one gene beyond two-fold). `r fmt(l_up)` genes were more highly expressed in
+territorial fish and `r fmt(l_down)` in social fish. The territorial-high set
+included a ferritin middle subunit, an NADH dehydrogenase iron–sulfur subunit,
+MARCKS-related protein 1, a mannose-binding protein C-like lectin, WD repeat domain
+45 and components of the proteasome, spliceosome and oligosaccharyltransferase
+complexes; the social-high set included coagulation factor X, low-density lipoprotein
+receptor-related protein 1, unconventional myosin XVI and an alpha-tubulin
+N-acetyltransferase. No GO term or KEGG pathway was enriched (`r lgo_sig` and
+`r lk_sig` at FDR < 0.05).
+
+```{r}
+#| label: tbl-liver
+#| tbl-cap: !expr sprintf("All %d liver genes differentially expressed between territorial and social sockeye (adjusted p < 0.05). Positive fold changes indicate higher expression in territorial fish. LOC identifiers are NCBI gene symbols for genes without an assigned name.", l_sig)
+kable(gene_tbl(L$sig, by = "lfc"), align = c("l", "l", "r", "r"))
+```
+
+## Gonad
+
+The gonad responded strongly: 1,630 of 18,935 tested genes were
+differentially expressed (@fig-overview E, F), of which `r fmt(g_up)`
+(`r pct(g_up, g_sig)`) were more highly expressed in territorial fish and
+`r fmt(g_down)` in social fish. The median |log~2~ fold change| was
+`r formatC(g_medlfc, format = "f", digits = 2)` and `r fmt(g_lfc1)` genes changed more
+than two-fold. The largest effects were increases in territorial fish of genes of
+the acute-phase and innate immune response: two serum amyloid A-5 paralogues and an
+equistatin-like protease inhibitor were each about 60-fold higher (log~2~ fold change
+6.0–6.2), and ladderlectin-like, saxiphilin-like and neurofibromin-like genes were
+30–40-fold higher (@tbl-gonad). The most statistically robust changes were an
+increase in the small heat shock protein *hspb11* and the centrosomal protein
+*cep170*. Genes higher in social fish included vasotocin-neurophysin VT1,
+a CD209 antigen-like lectin, dentin sialophosphoprotein-like and an inward-rectifier
+potassium channel.
+
+```{r}
+#| label: tbl-gonad
+#| tbl-cap: "The 20 gonad genes with the largest absolute shrunken fold change between territorial and social sockeye (adjusted p < 0.05). Positive values indicate higher expression in territorial fish."
+kable(gene_tbl(G$sig, n = 20, by = "lfc"), align = c("l", "l", "r", "r"))
+```
+
+## Functional enrichment in the gonad
+
+Over-representation analysis recovered a coherent programme (@tbl-kegg, @tbl-go).
+`r fmt(k_sig)` KEGG pathways were enriched at FDR < 0.05, led by oxidative
+phosphorylation (`r oxphos$numDEInCat` of `r oxphos$numInCat` pathway genes
+differentially expressed, FDR `r sci(oxphos$FDR)`) and ribosome
+(`r ribo$numDEInCat` of `r ribo$numInCat`, FDR `r sci(ribo$FDR)`), followed by
+protein export, nucleotide excision repair and RNA polymerase. The direction of
+these changes was almost entirely one-sided: all `r ox_dir["n"]` differentially
+expressed oxidative phosphorylation genes and `r ribo_dir["up"]` of `r ribo_dir["n"]`
+ribosomal genes were higher in territorial fish. The `r fmt(go_sig)` enriched GO
+terms told the same story from the other annotation: structural constituent of
+ribosome, translation, cytosolic large ribosomal subunit, mitochondrial respirasome
+and respiratory chain complexes I, III and IV, ATP synthase, spliceosomal snRNPs,
+RNA polymerase II core complex, prefoldin and chaperone-mediated complex assembly.
+Together these describe gonadal tissue in territorial fish that is synthesising more
+protein and generating more ATP than that of social fish.
+
+```{r}
+#| label: tbl-kegg
+#| tbl-cap: "KEGG pathways over-represented among gonad genes differentially expressed between territorial and social sockeye (hypergeometric test, FDR < 0.05). Universe: all genes with an adjusted p-value that map to at least one pathway."
+G$kegg %>% filter(FDR < 0.05) %>%
+  transmute(Pathway = category, Name = name, `DE genes` = numDEInCat, `Pathway genes` = numInCat,
+            p = sapply(over_represented_pvalue, sci), FDR = sapply(FDR, sci)) %>%
+  kable(align = c("l", "l", "r", "r", "r", "r"))
+```
+
+```{r}
+#| label: tbl-go
+#| tbl-cap: !expr sprintf("Gene Ontology terms over-represented among gonad genes differentially expressed between territorial and social sockeye (hypergeometric test, FDR < 0.05; %d terms). BP, biological process; CC, cellular component; MF, molecular function.", go_sig)
+G$go %>% filter(FDR < 0.05) %>%
+  transmute(Term = category, Description = term, Ontology = ontology, `DE genes` = numDEInCat, `Term genes` = numInCat,
+            FDR = sapply(FDR, sci)) %>%
+  kable(align = c("l", "l", "c", "r", "r", "r"))
+```
+
+## Overlap between tissues
+
+`r length(shared)` genes were differentially expressed in both tissues
+(`r paste(shared, collapse = ", ")`), including the NADH dehydrogenase iron–sulfur
+subunit 5-like gene, the oligosaccharyltransferase subunit OSTC, proteasome subunit
+SEM1 and splicing factor 3B subunit 6, each higher in territorial fish in both
+tissues. This is a small set, but its composition mirrors at the level of individual
+genes the translation and energy-metabolism programme that dominates the gonad.
+
+![Transcriptome-wide comparison of territorial (blue circles) and social (red triangles) sockeye salmon in liver (A–C) and gonad (D–F). (A, D) Principal component analysis of variance-stabilised counts with 95% confidence ellipses. (B, E) Volcano plots of all tested genes; colour indicates the sign of the shrunken fold change. (C, F) Row-scaled expression of the differentially expressed genes (adjusted p < 0.05) across samples, with hierarchical clustering; n gives the number of genes.](../figures/figure_X.png){#fig-overview}
+
+# Discussion
+
+Territorial and social sockeye differed sharply in their gonadal transcriptomes and
+barely at all in their livers. The gonadal signature has two components. The larger
+one, comprising most of the `r fmt(g_sig)` differentially expressed genes and all of
+the enriched pathways, is a coordinated increase in the machinery of protein
+synthesis and mitochondrial ATP production in territorial fish. The smaller, more
+dramatic one is a set of acute-phase and stress-response genes induced ten- to
+sixty-fold. We consider each in turn, then the near-silence of the liver, and finally
+what this design can and cannot say about cause.
+
+## A gonad working harder
+
+Ribosomal proteins, translation factors, respiratory chain complexes and ATP synthase
+are among the most abundant transcripts in any cell, and their coordinated elevation
+indicates a tissue with higher biosynthetic and energetic demand rather than a change
+in cell identity. In a maturing ovary, that demand is set by oocyte growth: the
+accumulation of yolk, the synthesis of zona pellucida and maternal transcripts, and
+the mitochondrial proliferation that provisions the egg [@Kleppe2014]. An ovary in
+which these processes are more active is an ovary further into, or more heavily
+invested in, maturation. The simplest reading of our result is therefore that
+territorial females were in a more advanced or more active state of reproductive
+investment than social females at the time of capture. This aligns with the
+observation across teleosts that dominance and reproductive activation are coupled:
+in tilapia, dominant individuals have higher gonadosomatic index, higher circulating
+gonadotropins and sex steroids, and testis transcriptomes in which growth-factor,
+gonadotropin and steroidogenic pathways are up-regulated [@Thonnes2022;
+@HollanderCohen2022], and dominance-associated brain gene expression in cichlids is
+enriched for genes with reproductive-state bias [@Renn2016]. In sockeye, a female
+holding and defending a nest site is by definition close to spawning, whereas a
+female in an aggregation may be staging. The pronounced substructure among
+territorial gonads on the first principal component, together with the wide
+variation in zona pellucida transcript abundance among fish, suggests that
+maturation stage varied within the territorial group as well, and that phenotype is
+a coarse proxy for a continuous reproductive state.
+
+The one-sidedness of the pattern deserves emphasis. Every differentially expressed
+oxidative phosphorylation gene was higher in territorial fish. In male mice living in
+social hierarchies, splenic oxidative phosphorylation genes are instead uniformly
+higher in subordinates, and hepatic fatty acid oxidation is higher in dominants
+[@Lee2022], while in rainbow trout the same hepatic pathways move in the opposite
+direction to mice [@Kostyniuk2018]. Energy-metabolism transcription is evidently
+highly responsive to social phenotype but in a tissue- and context-specific way, and
+in the salmon ovary the direction is toward greater capacity in the territorial
+phenotype.
+
+## Acute-phase and stress genes
+
+The largest fold changes in the data set were induction, in territorial gonads, of two
+serum amyloid A paralogues, an equistatin-like cysteine protease inhibitor, a
+ladderlectin, a saxiphilin-like transferrin-family protein and the small heat shock
+protein *hspb11*. Serum amyloid A is a canonical acute-phase reactant whose
+transcription rises by orders of magnitude in response to inflammatory cytokines,
+and lectins, protease inhibitors and heat shock proteins are the effectors of the
+innate response to tissue damage and infection. Their appearance in ovary rather
+than liver suggests a local response within the gonad. Two non-exclusive
+explanations fit. Territorial behaviour, especially nest defence, is aggressive and
+energetically costly [@Quinn1999; @McVeigh2007] and may carry a systemic
+inflammatory and glucocorticoid load that peripheral tissues register [@Gilmour2005;
+@SnyderMackler2016]. Alternatively, an ovary approaching ovulation undergoes
+follicular remodelling that recruits many of the same innate-immune and
+chaperone pathways. Distinguishing these requires the maturity staging and plasma
+measurements that the present design lacks.
+
+Among genes higher in social fish, vasotocin-neurophysin VT1 is notable. Vasotocin,
+the teleost homologue of vasopressin, is a nonapeptide whose neural expression is
+repeatedly associated with dominance, aggression and territoriality in fishes
+[@Godwin2012], and it was up-regulated in the brains of dominant cichlid females
+[@Renn2016]. Its expression in gonad, where it was more than four-fold lower in
+territorial fish, points to peripheral nonapeptide signalling in the ovary that is
+patterned by behavioural phenotype, a possibility not previously reported in salmon
+and worth targeted follow-up.
+
+## A liver that does not tell the two phenotypes apart
+
+Only `r fmt(l_sig)` hepatic genes differed between phenotypes, with small fold
+changes and no pathway enrichment. This contrasts with the marked hepatic metabolic
+reorganisation seen in juvenile rainbow trout after a few days of paired
+confinement [@Kostyniuk2018] and in group-housed mice [@Lee2022]. Several
+differences in design may explain the contrast. Those experiments imposed dyadic or
+group hierarchies in the laboratory and sampled during active feeding, when the
+liver's role in partitioning ingested energy between growth and storage makes it a
+sensitive readout of status. Adult sockeye on the spawning migration do not feed,
+and both phenotypes were drawing on the same finite somatic reserves; the liver's
+transcriptional programme may be dominated by that shared state. The few genes that
+did differ are nonetheless interpretable: higher ferritin and a respiratory-chain
+subunit in territorial fish, and lower coagulation factor X and LRP1, are consistent
+with mild differences in iron handling, oxidative metabolism and plasma-protein
+synthesis rather than a distinct hepatic phenotype. It is also possible that the
+liver responds on a slower timescale than the gonad, or that the field
+classification captured a behavioural state too transient to be recorded in hepatic
+transcription. The 11 genes shared between tissues, which include the same
+respiratory-chain and translation-associated genes that dominate the gonad, hint
+that a weak systemic version of the gonadal programme reaches the liver.
+
+## Methodological note on enrichment testing with TagSeq
+
+We report enrichment from the hypergeometric test rather than the length-weighted
+Wallenius test that is goseq's default. The default is appropriate for
+whole-transcript RNA-seq, where longer transcripts accrue more reads and are called
+differentially expressed more readily [@Young2010]. TagSeq removes that dependence
+by design [@Meyer2011; @Lohman2016]. In our gonad data the length association was
+strong but inverted: short genes were five times more likely to be differentially
+expressed than long ones, because ribosomal and respiratory-chain genes are short
+and were the genes that changed. Applying the Wallenius weighting therefore removed
+the signal rather than a bias, reducing the enriched KEGG pathways from
+`r k_sig` to one and, in an independent re-execution on a different operating
+system, to zero, because the weighting spline is numerically sensitive. We flag this
+because length-bias correction is often applied to 3′-tag data by default, and in
+data sets where the differentially expressed genes are themselves short it will
+systematically hide the result.
+
+## Limitations
+
+The design is observational and cross-sectional. Fish were classified by behaviour
+at capture and sampled once, so we cannot distinguish a gonadal state that causes
+territorial behaviour from one that accompanies or follows it, and we cannot exclude
+that phenotype assignment partly reflects maturation stage. Sex and maturity were not
+part of the metadata available to this analysis; we infer from marker-gene
+expression that all gonads were ovarian, but this must be verified against
+dissection records, and the analysis should be repeated with maturity stage as a
+covariate if it was recorded. Two gonad samples were excluded on the basis of a
+correlation heatmap without a pre-registered criterion. The sample size, 15 per
+group, gives good power for the large gonadal effects but limited power in the
+liver, where the true number of affected genes is probably larger than 31. Finally,
+because the reported differentially expressed gene counts come from shrunken result
+tables whose adjusted p-values were computed with DESeq2's default independent
+filtering target of 0.1, the unshrunken tables filtered at 0.05 call more genes (66
+in liver and 1,653 in gonad); the gene sets and all enrichment conclusions are
+unchanged, but the counts should not be compared across the two conventions.
+
+# Conclusions
+
+In adult sockeye salmon, the territorial phenotype is written in the gonad. Territorial
+females carried an ovarian transcriptome with elevated translation and oxidative
+phosphorylation and strong induction of acute-phase genes, whereas their livers were
+almost indistinguishable from those of social females. The results identify
+reproductive investment, rather than hepatic energy metabolism, as the physiological
+axis along which behavioural type varies in spawning-phase sockeye, and they offer a
+set of candidate genes, from serum amyloid A to vasotocin, for testing whether
+gonadal state drives behaviour or behaviour drives gonadal state.
+
+# Data and code availability
+
+Count matrices, phenotype tables, annotation resources, all result tables and the
+complete analysis are in the project repository at
+<https://github.com/RobertsLab/project-sockeye-tagseq>, and the rendered analysis is
+published at <https://robertslab.github.io/project-sockeye-tagseq/>. Raw FASTQ files
+are currently hosted at
+<https://gannet.fish.washington.edu/panopea/berdahl-sockeye-salmon/> and will be
+deposited in the NCBI Sequence Read Archive **[[BioProject accession to be added]]**.
+
+# Author contributions and funding
+
+**[[To be completed.]]**
+
+# References
+
+::: {#refs}
+:::

@@ -1,0 +1,5 @@
+# Retrieved 2026-08-30 from the KEGG REST API for organism 'one'
+# (Oncorhynchus nerka, KEGG genome T07952).
+#   https://rest.kegg.jp/link/pathway/one  -> kegg_one_gene2pathway.tsv
+#   https://rest.kegg.jp/list/pathway/one  -> kegg_one_pathways.tsv
+# Gene ids are NCBI GeneIDs, i.e. our LOC identifiers without the prefix.

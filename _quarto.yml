@@ -1,0 +1,48 @@
+project:
+  title: "Sockeye TagSeq"
+  # Every chunk runs with the working directory at the project root, so a path
+  # written in one notebook means the same thing in all of them. This replaces
+  # the three different working-directory assumptions the .Rmd notebooks made
+  # (finding B1) and the setwd() calls inside chunks, which knitr resets at
+  # every chunk boundary (finding R7).
+  execute-dir: project
+
+  # Rendered HTML goes here, and the GitHub Action publishes it to Pages. docs/
+  # is gitignored: nothing generated is committed, so a stale rendered page can
+  # never contradict the tracked result tables.
+  output-dir: docs
+
+  # Without this list, Quarto renders every .qmd and .Rmd under the project
+  # directory. That pulled in the deprecated shell transcript
+  # (archive/1_process-tagseq-data-salmon.Rmd), whose ~40 bash chunks carried no
+  # eval guard and would have run wget, rsync and hisat2 against absolute paths
+  # on one particular machine (finding B5). The list also fixes the render
+  # order, so 03 and 04 always read results 02 has just written.
+  #
+  # NOTE: 02 is parameterised by tissue and defaults to liver, so a bare
+  # `quarto render` regenerates the liver results only (finding B6). Use
+  # ./render-all.sh, which renders it once per tissue. That script is the
+  # documented entry point for the whole analysis.
+  render:
+    - index.qmd
+    - tag-seq/code/01-upstream-alignment.qmd
+    - tag-seq/code/02-differential-expression.qmd
+    - tag-seq/code/03-gene-tables.qmd
+    - tag-seq/code/04-enrichment.qmd
+
+execute:
+  # Replaces knitr's cache = TRUE. Quarto's freeze invalidates on source
+  # change; the old cache invalidated on nothing, and was combined with
+  # rm(list = ls()) at the top of the library chunk (finding R6).
+  freeze: auto
+  warning: true
+  message: false
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    code-fold: show
+    df-print: paged
+    embed-resources: true

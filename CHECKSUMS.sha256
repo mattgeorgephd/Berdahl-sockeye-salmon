@@ -1,0 +1,20 @@
+# sha256 of every file the analysis reads as input.
+#
+# The six data and genome files are what notebooks 02, 03 and 04 depend on; the two
+# kegg_one_* files are vendored KEGG REST responses (see tag-seq/genome/kegg_one_SOURCE.txt).
+# Nothing derived is listed here -- derived files are tracked in git and diffed after a
+# render instead.
+#
+# Checked automatically by verify_inputs() in tag-seq/code/_common.R at the start of every
+# render; a mismatch warns, it does not stop. Check by hand with:
+#     shasum -c CHECKSUMS.sha256
+# Re-record after a deliberate data change with:
+#     shasum -a 256 $(awk '!/^#/ && NF {print $2}' CHECKSUMS.sha256) > CHECKSUMS.sha256
+9633280060f9ae977d78c505d91852a3d018894835daf15dc456cb099207ebd1  tag-seq/data/onerka_gene_count_matrix-gonad.csv
+14c4534ab060722ba8320bb780a59b03f55483cb1c3d0e3446fb43a63658cfe6  tag-seq/data/onerka_gene_count_matrix-liver.csv
+51e81d5683147b56640048d1b4e4c58468fff3452c1c29db1da3379ccaa5f48c  tag-seq/data/treatments-gonad.csv
+adef75b89e4f84f1644927ca2cf0b179f50ee9425acc31e659d65fdbb56750ce  tag-seq/data/treatments-liver.csv
+fd05fe737a9aaa5cb4f737757437b657e5a87a7ff9df7fbde62dd4c62bd259e0  tag-seq/genome/GCF_006149115.2_Oner_1.1_feature_table.txt
+f22a749b60a3811cd073e69a245b4bc0bed7798ca5f54c9a1190c622d021b374  tag-seq/genome/GCF_006149115.2_Oner_1.1_gene_ontology.gaf.gz
+ccfed30c8233f372dee6b2e4080add8bc00e99b0d25fb76829ab051b26722892  tag-seq/genome/kegg_one_gene2pathway.tsv
+cb58038df5143450e71b6b7c7f2683ac9dec758585966d4743991c93888df0d0  tag-seq/genome/kegg_one_pathways.tsv

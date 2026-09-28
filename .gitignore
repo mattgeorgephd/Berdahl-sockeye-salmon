@@ -1,0 +1,41 @@
+# ---- R / RStudio session state ----------------------------------------------
+# None of this describes the analysis; it describes one person's editor.
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+
+# ---- Knit / render caches ---------------------------------------------------
+*_cache/
+*_files/
+.quarto/
+_freeze/
+# Quarto's intermediate notebook when it picks the Jupyter engine for a document.
+*.quarto_ipynb
+
+# Rendered output. _quarto.yml sets output-dir: docs, and the render workflow
+# publishes docs/ to GitHub Pages as a build artifact -- nothing generated is
+# committed, so a stale HTML page can never contradict the tracked result
+# tables. The two patterns below catch HTML from before output-dir was set, and
+# from rendering a single notebook outside the project.
+/docs/
+tag-seq/code/*.html
+/*.html
+# The manuscript renders standalone, next to its source.
+manuscript/*.html
+manuscript/*.docx
+manuscript/*_files/
+
+# ---- renv -------------------------------------------------------------------
+# renv.lock IS tracked; the library it installs is not.
+renv/library/
+renv/staging/
+renv/local/
+renv/python/
+renv/sandbox/
+
+# ---- OS ---------------------------------------------------------------------
+.DS_Store
+
+
+/.quarto/

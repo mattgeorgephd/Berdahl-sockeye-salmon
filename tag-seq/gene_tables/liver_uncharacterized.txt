@@ -1,1 +1,1 @@
-gene,baseMean,log2FoldChange,lfcSE,pvalue,padj,description,treatment
+"gene","baseMean","log2FoldChange","lfcSE","pvalue","padj","description","treatment"

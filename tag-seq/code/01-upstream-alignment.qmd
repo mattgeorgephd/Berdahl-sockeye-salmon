@@ -1,0 +1,470 @@
+---
+title: "Upstream: FASTQ to count matrix"
+subtitle: "Alignment and assembly on Raven"
+# Every chunk here is bash. Without this line Quarto infers the Jupyter engine
+# from the chunk languages and needs a Python kernel with nbformat -- which the
+# CI runner does not have, so the first step of render-all.sh failed there and
+# nothing downstream was ever rendered. knitr handles bash chunks natively, and
+# with eval: false it executes nothing anyway.
+engine: knitr
+execute:
+  eval: false
+---
+
+## Overview
+
+This notebook documents how the count matrices (`tag-seq/data/onerka_gene_count_matrix-{liver,gonad}.csv`) 
+were produced from raw FASTQ files. **Evaluation is disabled by default** because these steps require 
+Raven-scale compute and are not part of a typical render.
+
+It is provided for reference and reproducibility: every step is present, with no manual "I moved files" 
+comments. A clean checkout of this repository can reproduce the count matrices by running these steps 
+on Raven (after restoring the environment and locating the FASTQ data on Gannet).
+
+## Environment and tool versions
+
+Documented here because these tools are not in `renv.lock`:
+
+- HISAT2 2.2.1 (read alignment, HISAT2 branch only; bowtie2 is abandoned)
+- StringTie 2.2.1 (transcript assembly)
+- samtools 1.12 (BAM manipulation)
+- cutadapt (adapter trimming)
+- FastQC (read quality control)
+- bedtools2 (coordinate sorting)
+
+## Paths and configuration
+
+Define all paths once at the top so they can be modified for different environments (Raven vs. 
+laptop, different disk mount points, etc.).
+
+```{bash}
+# ---- CONFIGURATION: edit these paths for your environment ----
+
+# Root directory for all work and data storage
+PROJECT_ROOT="/home/shared/8TB_HDD_02/mattgeorgephd/berdahl-sockeye-salmon"
+
+# Tool locations
+BEDTOOLS="/home/shared/bedtools2/bin/sortBed"
+FASTQC="/home/shared/FastQC/fastqc"
+CUTADAPT="/home/shared/8TB_HDD_02/mattgeorgephd/.local/bin/cutadapt"
+HISAT2_BIN="/home/shared/hisat2-2.2.1/hisat2"
+HISAT2_BUILD="/home/shared/hisat2-2.2.1/hisat2-build"
+SAMTOOLS="/home/shared/samtools-1.12/samtools"
+STRINGTIE="/home/shared/stringtie-2.2.1/stringtie"
+
+# Derived paths (do not edit)
+SEQUENCES_DIR="$PROJECT_ROOT/sequences"
+RAW_GONAD="$PROJECT_ROOT/raw-data-gonad"
+RAW_LIVER="$PROJECT_ROOT/raw-data-liver"
+RAW_BRAIN="$PROJECT_ROOT/raw-data-brain"
+TRIM_GONAD="$PROJECT_ROOT/trim-fastq-gonad"
+TRIM_LIVER="$PROJECT_ROOT/trim-fastq-liver"
+TRIM_BRAIN="$PROJECT_ROOT/trim-fastq-brain"
+HISAT2_SAM_GONAD="$PROJECT_ROOT/hisat2_sam-gonad"
+HISAT2_SAM_LIVER="$PROJECT_ROOT/hisat2_sam-liver"
+HISAT2_SAM_BRAIN="$PROJECT_ROOT/hisat2_sam-brain"
+HISAT2_BAM_GONAD="$PROJECT_ROOT/hisat2_bam-gonad"
+HISAT2_BAM_LIVER="$PROJECT_ROOT/hisat2_bam-liver"
+HISAT2_BAM_BRAIN="$PROJECT_ROOT/hisat2_bam-brain"
+FASTQC_GONAD="$PROJECT_ROOT/fastqc-gonad"
+FASTQC_LIVER="$PROJECT_ROOT/fastqc-liver"
+FASTQC_BRAIN="$PROJECT_ROOT/fastqc-brain"
+
+# ---- END CONFIGURATION ----
+
+cd "$PROJECT_ROOT"
+```
+
+## Download reference assembly
+
+Get sockeye salmon assembly GCF_006149115.2 from NCBI.
+
+```{bash}
+# Download genome sequence and annotation
+mkdir -p "$SEQUENCES_DIR"
+cd "$SEQUENCES_DIR"
+
+wget -r \
+  --no-directories --no-parent \
+  -P . \
+  -A GCF_006149115.2_Oner_1.1_genomic.gff https://gannet.fish.washington.edu/panopea/berdahl-sockeye-salmon/genome/ \
+  --no-check-certificate
+
+wget -r \
+  --no-directories --no-parent \
+  -P . \
+  -A GCF_006149115.2_Oner_1.1_genomic.fna https://gannet.fish.washington.edu/panopea/berdahl-sockeye-salmon/genome/ \
+  --no-check-certificate
+
+head "$SEQUENCES_DIR/GCF_006149115.2_Oner_1.1_genomic.fna"
+```
+
+## Prepare reference files
+
+### Calculate chromosome lengths
+
+```{bash}
+awk '$0 ~ ">" {print c; c=0;printf substr($0,2,14) "\t"; } $0 !~ ">" {c+=length($0);} END { print c; }' \
+  "$SEQUENCES_DIR/GCF_006149115.2_Oner_1.1_genomic.fna" \
+| sed 's/Cr//g' \
+| awk '{print $1"\t"$3}' \
+| tail -n +2 \
+> "$SEQUENCES_DIR/GCF_006149115.2_Oner_1.1_genomic-sequence-lengths.txt"
+
+head "$SEQUENCES_DIR/GCF_006149115.2_Oner_1.1_genomic-sequence-lengths.txt"
+```
+
+### Generate mRNA feature track
+
+```{bash}
+head "$SEQUENCES_DIR/GCF_006149115.2_Oner_1.1_genomic.gff"
+
+grep -e "Gnomon	mRNA" -e "RefSeq	mRNA" -e "cmsearch	mRNA" -e "tRNAscan-SE	mRNA" \
+  "$SEQUENCES_DIR/GCF_006149115.2_Oner_1.1_genomic.gff" \
+| "$BEDTOOLS" \
+  -faidx "$SEQUENCES_DIR/GCF_006149115.2_Oner_1.1_genomic-sequence-lengths.txt" \
+> "$SEQUENCES_DIR/GCF_006149115.2_Oner_1.1_mRNA.gff"
+
+head "$SEQUENCES_DIR/GCF_006149115.2_Oner_1.1_mRNA.gff"
+```
+
+## Download raw FASTQ data
+
+### Gonad
+
+```{bash}
+mkdir -p "$RAW_GONAD"
+cd "$RAW_GONAD"
+
+wget -r \
+  --no-directories --no-parent \
+  -P . \
+  -A .fastq.gz https://gannet.fish.washington.edu/panopea/berdahl-sockeye-salmon/20220714-tagseq-gonad/ \
+  --no-check-certificate
+
+gunzip *.fastq.gz
+```
+
+### Liver
+
+```{bash}
+mkdir -p "$RAW_LIVER"
+cd "$RAW_LIVER"
+
+wget -r \
+  --no-directories --no-parent \
+  -P . \
+  -A .fastq.gz https://gannet.fish.washington.edu/panopea/berdahl-sockeye-salmon/20220917-tagseq-liver/ \
+  --no-check-certificate
+
+gunzip *.fastq.gz
+```
+
+### Brain (UNRESOLVED — FASTQs presumed missing)
+
+Per project decision 4, the brain tissue was sequenced but the data is presumed missing from 
+Gannet. The steps below are documented for completeness, but nothing downstream consumes brain 
+data and no count matrix was generated. If the raw FASTQs are located, these steps can be 
+uncommented and processed like gonad and liver.
+
+```{bash}
+# mkdir -p "$RAW_BRAIN"
+# cd "$RAW_BRAIN"
+#
+# wget -r \
+#   --no-directories --no-parent \
+#   -P . \
+#   -A .fastq.gz https://gannet.fish.washington.edu/panopea/berdahl-sockeye-salmon/20220917-tagseq-brain/ \
+#   --no-check-certificate
+#
+# gunzip *.fastq.gz
+```
+
+## Quality control (FastQC)
+
+### Gonad untrimmed reads
+
+```{bash}
+mkdir -p "$FASTQC_GONAD/untrimmed"
+
+"$FASTQC" \
+  "$RAW_GONAD"/*.fastq \
+  --outdir "$FASTQC_GONAD/untrimmed" \
+  --quiet
+```
+
+### Liver untrimmed reads
+
+```{bash}
+mkdir -p "$FASTQC_LIVER/untrimmed"
+
+"$FASTQC" \
+  "$RAW_LIVER"/*.fastq \
+  --outdir "$FASTQC_LIVER/untrimmed" \
+  --quiet
+```
+
+### Brain untrimmed reads (unresolved)
+
+```{bash}
+# mkdir -p "$FASTQC_BRAIN/untrimmed"
+#
+# "$FASTQC" \
+#   "$RAW_BRAIN"/*.fastq \
+#   --outdir "$FASTQC_BRAIN/untrimmed" \
+#   --quiet
+```
+
+## Adapter trimming (cutadapt)
+
+### Gonad
+
+```{bash}
+mkdir -p "$TRIM_GONAD"
+cd "$RAW_GONAD"
+
+for F in *.fastq; do
+  results_file="${F%.*}.trim.fastq"
+  # Hard trim first 15 bp (to remove random barcode)
+  # Adapter sequences: A{8} = ploy-A, G{8} = poly-G, AGATCGG = Illumina
+  # Minimum length cutoff: 20 bp
+  "$CUTADAPT" "$F" -a A{8} -a G{8} -a AGATCGG -u 15 -m 20 \
+    -o "$TRIM_GONAD/$results_file"
+done
+```
+
+### Liver
+
+```{bash}
+mkdir -p "$TRIM_LIVER"
+cd "$RAW_LIVER"
+
+for F in *.fastq; do
+  results_file="${F%.*}.trim.fastq"
+  "$CUTADAPT" "$F" -a A{8} -a G{8} -a AGATCGG -u 15 -m 20 \
+    -o "$TRIM_LIVER/$results_file"
+done
+```
+
+### Brain (unresolved)
+
+```{bash}
+# mkdir -p "$TRIM_BRAIN"
+# cd "$RAW_BRAIN"
+#
+# for F in *.fastq; do
+#   results_file="${F%.*}.trim.fastq"
+#   "$CUTADAPT" "$F" -a A{8} -a G{8} -a AGATCGG -u 15 -m 20 \
+#     -o "$TRIM_BRAIN/$results_file"
+# done
+```
+
+## Quality control (FastQC on trimmed reads)
+
+### Gonad trimmed reads
+
+```{bash}
+mkdir -p "$FASTQC_GONAD/trimmed"
+
+"$FASTQC" \
+  "$TRIM_GONAD"/*.fastq \
+  --outdir "$FASTQC_GONAD/trimmed" \
+  --quiet
+```
+
+### Liver trimmed reads
+
+```{bash}
+mkdir -p "$FASTQC_LIVER/trimmed"
+
+"$FASTQC" \
+  "$TRIM_LIVER"/*.fastq \
+  --outdir "$FASTQC_LIVER/trimmed" \
+  --quiet
+```
+
+### Brain trimmed reads (unresolved)
+
+```{bash}
+# mkdir -p "$FASTQC_BRAIN/trimmed"
+#
+# "$FASTQC" \
+#   "$TRIM_BRAIN"/*.fastq \
+#   --outdir "$FASTQC_BRAIN/trimmed" \
+#   --quiet
+```
+
+## Alignment (HISAT2)
+
+### Build HISAT2 index
+
+```{bash}
+# Create HISAT2 index from reference genome (took ~31 min on Raven)
+"$HISAT2_BUILD" \
+  -f "$SEQUENCES_DIR/GCF_006149115.2_Oner_1.1_genomic.fna" \
+  "$SEQUENCES_DIR/hisat2_genome_index.fa"
+```
+
+### Gonad: align and convert to BAM
+
+```{bash}
+mkdir -p "$HISAT2_SAM_GONAD" "$HISAT2_BAM_GONAD"
+
+cd "$TRIM_GONAD"
+for F in *.trim.fastq; do
+  sample_name="${F%.trim.fastq}"
+  {
+    "$HISAT2_BIN" \
+      --score-min L,0,-0.6 \
+      --dta \
+      -x "$SEQUENCES_DIR/hisat2_genome_index.fa" \
+      -U "$TRIM_GONAD/$F" \
+      -S "$HISAT2_SAM_GONAD/${sample_name}.sam" && \
+    "$SAMTOOLS" sort -@ 8 -o "$HISAT2_BAM_GONAD/${sample_name}.bam" "$HISAT2_SAM_GONAD/${sample_name}.sam"
+  } >> "$PROJECT_ROOT/hisat2_alignment_gonad.txt" 2>&1
+done
+
+# Extract and report alignment rates
+grep "overall alignment rate" "$PROJECT_ROOT/hisat2_alignment_gonad.txt"
+```
+
+### Liver: align and convert to BAM
+
+```{bash}
+mkdir -p "$HISAT2_SAM_LIVER" "$HISAT2_BAM_LIVER"
+
+cd "$TRIM_LIVER"
+for F in *.trim.fastq; do
+  sample_name="${F%.trim.fastq}"
+  {
+    "$HISAT2_BIN" \
+      --score-min L,0,-0.6 \
+      --dta \
+      -x "$SEQUENCES_DIR/hisat2_genome_index.fa" \
+      -U "$TRIM_LIVER/$F" \
+      -S "$HISAT2_SAM_LIVER/${sample_name}.sam" && \
+    "$SAMTOOLS" sort -@ 8 -o "$HISAT2_BAM_LIVER/${sample_name}.bam" "$HISAT2_SAM_LIVER/${sample_name}.sam"
+  } >> "$PROJECT_ROOT/hisat2_alignment_liver.txt" 2>&1
+done
+
+# Extract and report alignment rates
+grep "overall alignment rate" "$PROJECT_ROOT/hisat2_alignment_liver.txt"
+```
+
+### Brain: align and convert to BAM (unresolved)
+
+```{bash}
+# mkdir -p "$HISAT2_SAM_BRAIN" "$HISAT2_BAM_BRAIN"
+#
+# cd "$TRIM_BRAIN"
+# for F in *.trim.fastq; do
+#   sample_name="${F%.trim.fastq}"
+#   {
+#     "$HISAT2_BIN" \
+#       --score-min L,0,-0.6 \
+#       --dta \
+#       -x "$SEQUENCES_DIR/hisat2_genome_index.fa" \
+#       -U "$TRIM_BRAIN/$F" \
+#       -S "$HISAT2_SAM_BRAIN/${sample_name}.sam" && \
+#     "$SAMTOOLS" sort -@ 8 -o "$HISAT2_BAM_BRAIN/${sample_name}.bam" "$HISAT2_SAM_BRAIN/${sample_name}.sam"
+#   } >> "$PROJECT_ROOT/hisat2_alignment_brain.txt" 2>&1
+# done
+#
+# grep "overall alignment rate" "$PROJECT_ROOT/hisat2_alignment_brain.txt"
+```
+
+## Transcript assembly (StringTie)
+
+### Gonad
+
+```{bash}
+mkdir -p "$PROJECT_ROOT/stringtie_gtf-gonad"
+
+cd "$HISAT2_BAM_GONAD"
+for file in *.bam; do
+  sample_name="${file%.bam}"
+  "$STRINGTIE" -p 8 \
+    -G "$SEQUENCES_DIR/GCF_006149115.2_Oner_1.1_mRNA.gff" \
+    -o "$PROJECT_ROOT/stringtie_gtf-gonad/${sample_name}.gtf" \
+    -l "$sample_name" \
+    "$file"
+done
+
+ls "$PROJECT_ROOT/stringtie_gtf-gonad/" | head
+```
+
+### Liver
+
+```{bash}
+mkdir -p "$PROJECT_ROOT/stringtie_gtf-liver"
+
+cd "$HISAT2_BAM_LIVER"
+for file in *.bam; do
+  sample_name="${file%.bam}"
+  "$STRINGTIE" -p 8 \
+    -G "$SEQUENCES_DIR/GCF_006149115.2_Oner_1.1_mRNA.gff" \
+    -o "$PROJECT_ROOT/stringtie_gtf-liver/${sample_name}.gtf" \
+    -l "$sample_name" \
+    "$file"
+done
+
+ls "$PROJECT_ROOT/stringtie_gtf-liver/" | head
+```
+
+### Brain (unresolved)
+
+```{bash}
+# mkdir -p "$PROJECT_ROOT/stringtie_gtf-brain"
+#
+# cd "$HISAT2_BAM_BRAIN"
+# for file in *.bam; do
+#   sample_name="${file%.bam}"
+#   "$STRINGTIE" -p 8 \
+#     -G "$SEQUENCES_DIR/GCF_006149115.2_Oner_1.1_mRNA.gff" \
+#     -o "$PROJECT_ROOT/stringtie_gtf-brain/${sample_name}.gtf" \
+#     -l "$sample_name" \
+#     "$file"
+# done
+```
+
+## Generate count matrices with prepDE.py
+
+The Python script `prepDE.py` aggregates StringTie GTF files into a count matrix.
+
+```{bash}
+# prepDE.py is from StringTie; make it executable if needed
+PREPDEPY="/home/shared/stringtie-2.2.1/prepDE.py"
+
+# Generate count matrix for gonad
+python3 "$PREPDEPY" \
+  -i "$PROJECT_ROOT/stringtie_gtf-gonad" \
+  -g "$PROJECT_ROOT/onerka_gene_count_matrix-gonad.csv" \
+  -t "$PROJECT_ROOT/onerka_transcript_count_matrix-gonad.csv"
+
+# Generate count matrix for liver
+python3 "$PREPDEPY" \
+  -i "$PROJECT_ROOT/stringtie_gtf-liver" \
+  -g "$PROJECT_ROOT/onerka_gene_count_matrix-liver.csv" \
+  -t "$PROJECT_ROOT/onerka_transcript_count_matrix-liver.csv"
+```
+
+## Quality summary
+
+Alignment rates reported by HISAT2 (from `hisat2_alignment_{gonad,liver}.txt`):
+
+- **Gonad:** 88.7% +/- 2.21 overall alignment rate
+- **Liver:** 86.5% +/- 0.82 overall alignment rate
+
+MultiQC reports and detailed FastQC results are committed alongside this notebook for reference.
+
+## Notes
+
+**Why `eval: false`?** These steps are computationally expensive (particularly alignment and 
+transcript assembly) and are meant to run on Raven's HPC, not on a laptop. By documenting them 
+here with `eval: false`, we preserve the complete pipeline while keeping default renders fast.
+
+**Bowtie2 branch removed:** This repository previously had a parallel `bowtie2` branch alongside 
+the HISAT2 work. It has been removed to reduce complexity; HISAT2 was used for the final analysis.
+
+**Brain tissue:** Included for completeness, but the raw FASTQs are presumed missing from Gannet. 
+If they are located, these sections can be uncommented and run exactly as documented.

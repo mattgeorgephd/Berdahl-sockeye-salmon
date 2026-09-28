@@ -1,0 +1,141 @@
+# Render the analysis on a machine that has never seen this project.
+#
+# This is the reproducibility test. Everything else in the repository — the
+# lockfile, the checksums, the assertions in _common.R — is a claim; this job is
+# what checks the claim. It restores the exact package versions from renv.lock,
+# runs the analysis end to end, and fails if the results differ from what is
+# committed in a way that a package-version bump does not explain
+# (see check-reproduction.R).
+#
+# On main, the rendered site is published to GitHub Pages. Pages must be set to
+# "GitHub Actions" as its source (Settings -> Pages -> Build and deployment);
+# nothing generated is committed to the repository.
+#
+# The first run builds the Bioconductor packages from source and takes upwards of
+# an hour. Later runs restore from the renv cache in minutes. If the cache is
+# ever the bottleneck, the fix is a container image with the library baked in,
+# not a shorter lockfile.
+
+name: render
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: render-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 150
+    env:
+      RENV_PATHS_ROOT: ~/.cache/R/renv
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Source builds of the Bioconductor stack need these. Kept explicit rather
+      # than discovered at failure time.
+      - name: System dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libcurl4-openssl-dev libssl-dev libxml2-dev libgit2-dev \
+            zlib1g-dev libbz2-dev liblzma-dev libpcre2-dev \
+            libpng-dev libjpeg-dev libtiff5-dev \
+            libfreetype6-dev libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
+            libcairo2-dev libxt-dev libglpk-dev
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          # Must match the R version recorded in renv.lock.
+          r-version: '4.3.2'
+          use-public-rspm: true
+
+      # Pinned to the version the analysis was developed and verified with
+      # (REPRODUCIBILITY-PLAN.md records Quarto 1.6.40). Unpinned, the action
+      # installed 1.10.18, whose post-processing of the parameterised 02 render
+      # failed on a resource path that 1.6.40 resolves. Part of the toolchain
+      # is R and packages in renv.lock; the other part is this.
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: 1.6.40
+
+      - name: Cache renv library
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.RENV_PATHS_ROOT }}
+          key: renv-${{ runner.os }}-R4.3.2-${{ hashFiles('renv.lock') }}
+          restore-keys: renv-${{ runner.os }}-R4.3.2-
+
+      # The lockfile is the environment. If this step fails, the pin is broken,
+      # which is itself the finding.
+      - name: Restore R environment from renv.lock
+        run: Rscript -e 'renv::restore(prompt = FALSE)'
+
+      - name: Report versions
+        run: |
+          Rscript -e 'sessionInfo()'
+          quarto --version
+
+      # Cheap, and it localises the blame: if an input changed, no downstream
+      # difference is meaningful.
+      - name: Verify input checksums
+        run: shasum -c CHECKSUMS.sha256
+
+      - name: Render
+        run: ./render-all.sh
+
+      - name: Check the render reproduced the committed results
+        run: Rscript check-reproduction.R
+
+      # Uploaded whether or not the check passed, so a failure can be inspected
+      # without re-running the job.
+      - name: Upload rendered site
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-site
+          path: docs/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Capture the result diff on failure
+        if: failure()
+        continue-on-error: true
+        run: git diff -- tag-seq/DESEQ_output tag-seq/gene_tables tag-seq/GO_output > result-diff.txt
+
+      - name: Upload the result diff
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: result-diff
+          path: result-diff.txt
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Package the site for Pages
+        if: github.ref == 'refs/heads/main' && success()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/
+
+  deploy:
+    needs: render
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

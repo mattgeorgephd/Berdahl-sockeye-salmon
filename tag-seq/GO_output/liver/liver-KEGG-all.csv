@@ -1,0 +1,192 @@
+"category","name","over_represented_pvalue","FDR","numDEInCat","numInCat"
+"one00190","Oxidative phosphorylation",0.0051965406993092,0.992539273568056,4,149
+"one04980","Cobalamin transport and metabolism",0.0298538737001271,1,1,6
+"one03440","Homologous recombination",0.0347483046075859,1,1,7
+"one03050","Proteasome",0.058142729628195,1,2,79
+"one04977","Vitamin digestion and absorption",0.0683726123066277,1,1,14
+"one00620","Pyruvate metabolism",0.127949811133901,1,1,27
+"one00270","Cysteine and methionine metabolism",0.132382891251594,1,1,28
+"one00630","Glyoxylate and dicarboxylate metabolism",0.132382891251594,1,1,28
+"one00860","Porphyrin metabolism",0.13679503782714,1,1,29
+"one04145","Phagocytosis",0.150816603145162,1,2,138
+"one00513","Various types of N-glycan biosynthesis",0.158544949625267,1,1,34
+"one00020","Citrate cycle (TCA cycle)",0.175577288972596,1,1,38
+"one00510","N-Glycan biosynthesis",0.188140843650985,1,1,41
+"one04216","Ferroptosis",0.22077986140464,1,1,49
+"one01100","Metabolic pathways",0.264174159188823,1,5,701
+"one04260","Cardiac muscle contraction",0.267460474279065,1,1,61
+"one04217","Necroptosis",0.363161672298973,1,1,88
+"one01200","Carbon metabolism",0.376308862199622,1,1,92
+"one04140","Autophagy - animal",0.486521962198412,1,1,129
+"one03040","Spliceosome",0.494614149707789,1,1,132
+"one04142","Lysosome biogenesis",0.523283354526514,1,1,143
+"one04141","Protein processing in endoplasmic reticulum",0.625555389950852,1,1,188
+"one03010","Ribosome",0.656711505777,1,1,204
+"one00010","Glycolysis / Gluconeogenesis",1,1,0,39
+"one00030","Pentose phosphate pathway",1,1,0,18
+"one00040","Pentose and glucuronate interconversions",1,1,0,15
+"one00051","Fructose and mannose metabolism",1,1,0,14
+"one00052","Galactose metabolism",1,1,0,11
+"one00053","Ascorbate and aldarate metabolism",1,1,0,11
+"one00061","Fatty acid biosynthesis",1,1,0,7
+"one00062","Fatty acid elongation",1,1,0,14
+"one00071","Fatty acid degradation",1,1,0,24
+"one00100","Steroid biosynthesis",1,1,0,15
+"one00120","Primary bile acid biosynthesis",1,1,0,7
+"one00130","Ubiquinone and other terpenoid-quinone biosynthesis",1,1,0,3
+"one00140","Steroid hormone biosynthesis",1,1,0,14
+"one00220","Arginine biosynthesis",1,1,0,14
+"one00230","Purine metabolism",1,1,0,46
+"one00232","Caffeine metabolism",1,1,0,2
+"one00240","Pyrimidine metabolism",1,1,0,24
+"one00250","Alanine, aspartate and glutamate metabolism",1,1,0,19
+"one00260","Glycine, serine and threonine metabolism",1,1,0,26
+"one00280","Valine, leucine and isoleucine degradation",1,1,0,25
+"one00310","Lysine degradation",1,1,0,32
+"one00330","Arginine and proline metabolism",1,1,0,22
+"one00340","Histidine metabolism",1,1,0,7
+"one00350","Tyrosine metabolism",1,1,0,12
+"one00360","Phenylalanine metabolism",1,1,0,8
+"one00380","Tryptophan metabolism",1,1,0,26
+"one00400","Phenylalanine, tyrosine and tryptophan biosynthesis",1,1,0,7
+"one00410","beta-Alanine metabolism",1,1,0,17
+"one00430","Taurine and hypotaurine metabolism",1,1,0,3
+"one00440","Phosphonate and phosphinate metabolism",1,1,0,5
+"one00450","Selenocompound metabolism",1,1,0,7
+"one00470","D-Amino acid metabolism",1,1,0,2
+"one00480","Glutathione metabolism",1,1,0,31
+"one00500","Starch and sucrose metabolism",1,1,0,12
+"one00511","Other glycan degradation",1,1,0,3
+"one00512","Mucin type O-glycan biosynthesis",1,1,0,4
+"one00514","Other types of O-glycan biosynthesis",1,1,0,13
+"one00515","Mannose type O-glycan biosynthesis",1,1,0,7
+"one00520","Amino sugar and nucleotide sugar metabolism",1,1,0,12
+"one00531","Glycosaminoglycan degradation",1,1,0,4
+"one00533","Glycosaminoglycan biosynthesis - keratan sulfate",1,1,0,6
+"one00534","Glycosaminoglycan biosynthesis - heparan sulfate / heparin",1,1,0,7
+"one00541","Biosynthesis of various nucleotide sugars",1,1,0,7
+"one00561","Glycerolipid metabolism",1,1,0,32
+"one00562","Inositol phosphate metabolism",1,1,0,34
+"one00563","Glycosylphosphatidylinositol (GPI)-anchor biosynthesis",1,1,0,2
+"one00564","Glycerophospholipid metabolism",1,1,0,48
+"one00565","Ether lipid metabolism",1,1,0,15
+"one00590","Arachidonic acid metabolism",1,1,0,15
+"one00591","Linoleic acid metabolism",1,1,0,4
+"one00592","alpha-Linolenic acid metabolism",1,1,0,8
+"one00600","Sphingolipid metabolism",1,1,0,19
+"one00601","Glycosphingolipid biosynthesis - lacto and neolacto series",1,1,0,7
+"one00603","Glycosphingolipid biosynthesis - globo and isoglobo series",1,1,0,3
+"one00604","Glycosphingolipid biosynthesis - ganglio series",1,1,0,2
+"one00640","Propanoate metabolism",1,1,0,21
+"one00650","Butanoate metabolism",1,1,0,9
+"one00660","C5-Branched dibasic acid metabolism",1,1,0,1
+"one00670","One carbon pool by folate",1,1,0,22
+"one00730","Thiamine metabolism",1,1,0,4
+"one00740","Riboflavin metabolism",1,1,0,7
+"one00760","Nicotinate and nicotinamide metabolism",1,1,0,13
+"one00770","Pantothenate and CoA biosynthesis",1,1,0,10
+"one00780","Biotin metabolism",1,1,0,1
+"one00785","Lipoic acid metabolism",1,1,0,13
+"one00790","Folate biosynthesis",1,1,0,16
+"one00830","Retinol metabolism",1,1,0,11
+"one00900","Terpenoid backbone biosynthesis",1,1,0,10
+"one00910","Nitrogen metabolism",1,1,0,7
+"one00920","Sulfur metabolism",1,1,0,5
+"one00970","Aminoacyl-tRNA biosynthesis",1,1,0,16
+"one00980","Metabolism of xenobiotics by cytochrome P450",1,1,0,19
+"one00982","Drug metabolism - cytochrome P450",1,1,0,18
+"one00983","Drug metabolism - other enzymes",1,1,0,33
+"one01040","Biosynthesis of unsaturated fatty acids",1,1,0,16
+"one01210","2-Oxocarboxylic acid metabolism",1,1,0,27
+"one01212","Fatty acid metabolism",1,1,0,31
+"one01230","Biosynthesis of amino acids",1,1,0,51
+"one01232","Nucleotide metabolism",1,1,0,36
+"one01240","Biosynthesis of cofactors",1,1,0,62
+"one01250","Biosynthesis of nucleotide sugars",1,1,0,13
+"one01320","Sulfur cycle",1,1,0,1
+"one02010","ABC transporters",1,1,0,11
+"one03008","Ribosome biogenesis in eukaryotes",1,1,0,32
+"one03013","Nucleocytoplasmic transport",1,1,0,64
+"one03015","mRNA surveillance pathway",1,1,0,73
+"one03018","RNA degradation",1,1,0,29
+"one03020","RNA polymerase",1,1,0,13
+"one03022","Basal transcription factors",1,1,0,10
+"one03030","DNA replication",1,1,0,3
+"one03060","Protein export",1,1,0,31
+"one03082","ATP-dependent chromatin remodeling",1,1,0,43
+"one03083","Polycomb repressive complex",1,1,0,35
+"one03250","Viral life cycle - HIV-1",1,1,0,28
+"one03260","Virion - Human immunodeficiency virus",1,1,0,1
+"one03264","Virion - Flavivirus and Alphavirus",1,1,0,3
+"one03265","Virion - Ebolavirus, Lyssavirus and Morbillivirus",1,1,0,3
+"one03266","Virion - Herpesvirus",1,1,0,5
+"one03267","Virion - Adenovirus",1,1,0,2
+"one03271","Virion - Rotavirus",1,1,0,1
+"one03272","Virion - Hepatitis viruses",1,1,0,27
+"one03273","Virion - Lassa virus and SFTS virus",1,1,0,9
+"one03320","PPAR signaling pathway",1,1,0,45
+"one03410","Base excision repair",1,1,0,5
+"one03420","Nucleotide excision repair",1,1,0,21
+"one03430","Mismatch repair",1,1,0,1
+"one03460","Fanconi anemia pathway",1,1,0,3
+"one04010","MAPK signaling pathway",1,1,0,106
+"one04012","ErbB signaling pathway",1,1,0,44
+"one04020","Calcium signaling pathway",1,1,0,63
+"one04060","Cytokine-cytokine receptor interaction",1,1,0,30
+"one04068","FoxO signaling pathway",1,1,0,78
+"one04070","Phosphatidylinositol signaling system",1,1,0,41
+"one04080","Neuroactive ligand-receptor interaction",1,1,0,33
+"one04081","Hormone signaling",1,1,0,56
+"one04082","Neuroactive ligand signaling",1,1,0,23
+"one04110","Cell cycle",1,1,0,59
+"one04114","Oocyte meiosis",1,1,0,58
+"one04115","p53 signaling pathway",1,1,0,25
+"one04120","Ubiquitin mediated proteolysis",1,1,0,84
+"one04122","Sulfur relay system",1,1,0,3
+"one04130","SNARE interactions in vesicular transport",1,1,0,15
+"one04136","Autophagy - other",1,1,0,24
+"one04137","Mitophagy - animal",1,1,0,96
+"one04144","Endocytosis",1,1,0,140
+"one04146","Peroxisome",1,1,0,46
+"one04148","Efferocytosis",1,1,0,76
+"one04150","mTOR signaling pathway",1,1,0,83
+"one04156","Integrated stress response (ISR) signaling pathway",1,1,0,40
+"one04210","Apoptosis",1,1,0,71
+"one04218","Cellular senescence",1,1,0,76
+"one04261","Adrenergic signaling in cardiomyocytes",1,1,0,66
+"one04270","Vascular smooth muscle contraction",1,1,0,52
+"one04310","Wnt signaling pathway",1,1,0,61
+"one04330","Notch signaling pathway",1,1,0,24
+"one04340","Hedgehog signaling pathway",1,1,0,15
+"one04350","TGF-beta signaling pathway",1,1,0,54
+"one04370","VEGF signaling pathway",1,1,0,28
+"one04371","Apelin signaling pathway",1,1,0,54
+"one04382","Cornified envelope formation",1,1,0,50
+"one04510","Focal adhesion",1,1,0,85
+"one04512","ECM-receptor interaction",1,1,0,17
+"one04514","Cell adhesion molecule (CAM) interaction",1,1,0,33
+"one04517","IgSF CAM signaling",1,1,0,125
+"one04518","Integrin signaling",1,1,0,53
+"one04519","Cadherin signaling",1,1,0,139
+"one04520","Adherens junction",1,1,0,57
+"one04530","Tight junction",1,1,0,101
+"one04540","Gap junction",1,1,0,35
+"one04620","Toll-like receptor signaling pathway",1,1,0,36
+"one04621","NOD-like receptor signaling pathway",1,1,0,83
+"one04622","RIG-I-like receptor signaling pathway",1,1,0,25
+"one04623","Cytosolic DNA-sensing pathway",1,1,0,17
+"one04625","C-type lectin receptor signaling pathway",1,1,0,55
+"one04672","Intestinal immune network for IgA production",1,1,0,3
+"one04744","Phototransduction",1,1,0,10
+"one04810","Regulation of actin cytoskeleton",1,1,0,98
+"one04814","Motor proteins",1,1,0,59
+"one04820","Cytoskeleton in muscle cells",1,1,0,55
+"one04910","Insulin signaling pathway",1,1,0,81
+"one04912","GnRH signaling pathway",1,1,0,49
+"one04914","Progesterone-mediated oocyte maturation",1,1,0,32
+"one04916","Melanogenesis",1,1,0,33
+"one04920","Adipocytokine signaling pathway",1,1,0,39
+"one04981","Folate transport and metabolism",1,1,0,4
+"one05100","Bacterial invasion of epithelial cells",1,1,0,41
+"one05132","Salmonella infection",1,1,0,158
+"one05168","Herpes simplex virus 1 infection",1,1,0,89

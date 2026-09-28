@@ -1,0 +1,119 @@
+---
+title: "Sockeye salmon TagSeq: territorial vs social"
+subtitle: "Gene expression in gonad and liver, *Oncorhynchus nerka*"
+date: today
+---
+
+This is the rendered analysis for the Berdahl sockeye salmon TagSeq experiment.
+Every number and figure below comes from re-running the notebooks in this
+repository; nothing is transcribed by hand.
+
+Reproduce it with `renv::restore()` followed by `./render-all.sh` from the
+project root. See the [repository
+README](https://github.com/RobertsLab/project-sockeye-tagseq#reproducibility)
+for the entry point and the expected-difference statement, and
+`REPRODUCIBILITY-PLAN.md` for the audit trail behind the current state of the
+code.
+
+## Design
+
+TagSeq (3'-end mRNA sequencing) of two tissues from fish assigned to two
+behavioural treatments, territorial and social.
+
+| Tissue | Samples sequenced | Territorial | Social | Analysed | Excluded |
+|---|---|---|---|---|---|
+| Liver | 30 (`B01`–`B30`) | 15 | 15 | 30 | — |
+| Gonad | 30 (`C01`–`C30`) | 15 | 15 | 28 | `C05`, `C17` |
+
+Counts are gene-level, quantified against NCBI assembly
+[GCF_006149115.2 (Oner_1.1)](https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_006149115.2/):
+37,942 genes before filtering. Treatment contrast is territorial vs social with
+`social` as the reference level, tested with DESeq2 and reported at
+`padj < 0.05`.
+
+::: {.callout-warning}
+## The two excluded gonad samples are not yet reproducibly justified
+
+`C05` and `C17` are dropped by a hardcoded `exclude` in `tag-seq/code/_common.R`,
+on the basis of a MultiQC sample-correlation inspection whose output is **not in
+this repository** — `tag-seq/QC/multiqc_gonad/` contains only a placeholder.
+This is the one analytical choice with a discretionary effect on the gonad
+results, and it currently rests on a statement rather than on evidence (audit
+findings R5 and E9). Treat the gonad counts as provisional until either the
+MultiQC output is committed or the exclusion criterion is computed inside
+notebook 02.
+:::
+
+## Notebooks
+
+| | Reads | Writes |
+|---|---|---|
+| [01 — Upstream alignment](tag-seq/code/01-upstream-alignment.html) | FASTQs on Gannet | count matrices |
+| [02 — Differential expression (liver)](tag-seq/code/02-differential-expression-liver.html) | `tag-seq/data/` | `tag-seq/DESEQ_output/liver/` |
+| [02 — Differential expression (gonad)](tag-seq/code/02-differential-expression-gonad.html) | `tag-seq/data/` | `tag-seq/DESEQ_output/gonad/` |
+| [03 — Gene tables](tag-seq/code/03-gene-tables.html) | significant DEGs | `tag-seq/gene_tables/` |
+| [04 — GO and KEGG enrichment](tag-seq/code/04-enrichment.html) | all DEGs, GAF, KEGG | `tag-seq/GO_output/` |
+
+Notebook 01 documents the FASTQ-to-count-matrix pipeline as it was run on Raven
+(HISAT2, StringTie, `prepDE.py`). Every chunk in it is `eval: false` — it is a
+record, not a step this render performs.
+
+## Results as committed
+
+Differential expression, territorial vs social, `padj < 0.05`, `apeglm`
+shrinkage:
+
+| Tissue | Genes tested | Significant | Characterized | Uncharacterized |
+|---|---|---|---|---|
+| Liver | 5,646 | 31 | 31 | 0 |
+| Gonad | 18,935 | 1,630 | 1,587 | 41 |
+
+Rows with no annotation available: 11 of 5,646 (liver), 12 of 18,935 (gonad).
+"Uncharacterized" means NCBI describes the gene as `uncharacterized LOC…`;
+2.5% of the significant gonad genes.
+
+Enrichment, FDR < 0.05:
+
+| Tissue | GO terms tested | GO enriched | KEGG pathways tested | KEGG enriched |
+|---|---|---|---|---|
+| Liver | 3,749 | 0 | 191 | 0 |
+| Gonad | 6,066 | 35 | 195 | 6 |
+
+Both use `goseq`'s hypergeometric over-representation test, GO against the NCBI
+GO annotation for this assembly (155,362 annotations, 32,629 genes, 6,937 terms)
+and KEGG against organism `one`, Benjamini–Hochberg corrected. The gonad signal
+is ribosomal and mitochondrial: the top KEGG pathways are oxidative
+phosphorylation (`one00190`, 59 of 188 genes, FDR 2e-16) and ribosome
+(`one03010`, 66 of 262, FDR 2e-13), and the top GO terms are structural
+constituent of ribosome, translation and the mitochondrial respiratory chain.
+
+`goseq`'s default Wallenius test, which re-weights genes by transcript length,
+is not used. TagSeq is 3′-end counting, so read count does not scale with
+length; the length association in these data runs the other way, with short
+genes far more likely to be differentially expressed; and the Wallenius result
+turned out to depend on the platform, with the three terms it called at FDR
+0.004–0.045 on macOS falling to 0.057–0.081 on Linux. The reasoning is set out
+in notebook 04.
+
+That the liver comparison yields no enriched terms is a result, not a failure:
+31 significant genes is little power for an over-representation test.
+
+## Result tables
+
+Tracked in git, so a re-render either reproduces them or shows a diff:
+
+- [`tag-seq/DESEQ_output/`](https://github.com/RobertsLab/project-sockeye-tagseq/tree/main/tag-seq/DESEQ_output) — per-tissue DESeq2 tables (unshrunken plus `normal`, `apeglm` and `ashr` shrinkage), PCA, heatmaps, volcano and MA plots
+- [`tag-seq/gene_tables/`](https://github.com/RobertsLab/project-sockeye-tagseq/tree/main/tag-seq/gene_tables) — significant genes split by annotation status, and the LOC identifier lists
+- [`tag-seq/GO_output/`](https://github.com/RobertsLab/project-sockeye-tagseq/tree/main/tag-seq/GO_output) — full and FDR-filtered GO and KEGG results
+
+## Data availability
+
+Raw FASTQ files are on Gannet:
+<https://gannet.fish.washington.edu/seashell/bu-github/project-sockeye-tagseq/>.
+
+They have **no archival accession yet** — no BioProject, no SRA (audit finding
+E10). Until they are deposited, the raw data has neither a persistence guarantee
+nor a citable identifier, and the analysis cannot be re-derived from source by
+anyone outside the lab. The committed count matrices are checksummed in
+`CHECKSUMS.sha256` and verified at the start of every render, which pins what
+this analysis was run on but does not substitute for the deposit.

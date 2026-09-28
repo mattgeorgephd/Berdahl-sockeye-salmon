@@ -1,0 +1,399 @@
+---
+title: "Differential expression"
+subtitle: "Territorial vs social sockeye salmon"
+date: today
+params:
+  tissue: liver
+execute:
+  warning: true
+  message: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This notebook runs the DESeq2 analysis for **one tissue**, chosen by the
+`tissue` parameter. It replaces `2_DESeq2_analysis-salmon-liver.Rmd` and
+`2_DESeq2_analysis-salmon-gonad.Rmd`, which were 571 and 582 lines differing in
+five places (finding E5).
+
+Render both tissues with:
+
+```bash
+quarto render tag-seq/code/02-differential-expression.qmd -P tissue:liver
+quarto render tag-seq/code/02-differential-expression.qmd -P tissue:gonad
+```
+
+Package versions are pinned in `renv.lock`; run `renv::restore()` once on a
+fresh clone. Nothing is installed at render time.
+
+## Setup
+
+```{r}
+#| label: load_libraries
+library(DESeq2)       # DESeqDataSetFromMatrix, DESeq, results, lfcShrink, vst, rlog
+library(apeglm)       # lfcShrink(type = "apeglm")
+library(ashr)         # lfcShrink(type = "ashr")
+library(PCAtools)     # pca, screeplot, biplot, pairsplot, getComponents
+library(pheatmap)     # sample-correlation heatmap
+library(RColorBrewer) # brewer.pal, for the DEG heatmap palette
+library(ggpubr)       # ggexport
+library(ggplot2)
+library(dplyr)
+library(tibble)       # rownames_to_column
+
+source("tag-seq/code/_common.R")
+
+cfg <- tissue_config(params$tissue)
+dir.create(cfg$dir, recursive = TRUE, showWarnings = FALSE)
+cfg[c("tissue", "prefix", "dir", "exclude")]
+```
+
+## Load data
+
+Samples are matched between the count matrix and the treatment table **by name**,
+not by column position. `prepDE.py` names columns after the GTF files
+(`01B_S43_R1.gtf`); the treatment tables use `B01`. `load_counts()` derives one
+from the other and asserts the two sets are identical before aligning them.
+
+The previous code assigned `colnames(cts) <- row.names(trt_list)` positionally
+and then "checked" it with `all(colnames(cts) %in% rownames(coldata))`, which is
+unconditionally `TRUE` after such a rename (finding R1). The assignment happened
+to be correct for the committed matrices — verified — but nothing would have
+caught a reordered re-run.
+
+```{r}
+#| label: load_data
+annotation    <- load_gene_annotation()
+feature_table <- annotation[, c("gene", "description")]
+
+dat     <- load_counts(cfg)
+cts     <- dat$cts
+coldata <- dat$coldata
+
+print(dplyr::count(coldata, trt))
+cat("samples:", ncol(cts), " genes:", nrow(cts), "\n")
+cat("reference level:", levels(coldata$trt)[1], "\n")
+```
+
+::: {.callout-important}
+## Gene identifiers were repaired
+
+StringTie row names are `gene-<id>|<id>`, and the identifier after the pipe is a
+`LOC` number for genes with no assigned symbol and a real symbol for the rest.
+The `.Rmd` split each name on the literal string `LOC` and kept the third piece,
+which works for `LOC115144855` and turns `gene-arhgap8|arhgap8` into the string
+`LOCNA` — for **4,731 genes, 12.5% of the annotation**, and disproportionately
+the well-characterised ones.
+
+Because `data.frame()` de-duplicates row names, those genes did not disappear:
+they reached the published tables as `LOCNA.1`, `LOCNA.2292` and so on —
+identifiers that correspond to nothing, join to nothing, and were therefore
+dropped from the gene tables as "no description". In the committed results that
+was 3 of 31 significant liver genes and **309 of 1,630 significant gonad genes**.
+
+Identifiers are now taken from after the pipe, which is unique across all 37,942
+genes, and descriptions come from the assembly feature table, which covers 37,929
+of them and agrees with the old LOCID table on all 33,210 they share.
+:::
+
+## Fit the model
+
+```{r}
+#| label: deseq
+dds <- DESeqDataSetFromMatrix(countData = cts,
+                              colData   = coldata,
+                              design    = ~ trt)
+dds <- DESeq(dds)
+resultsNames(dds)
+```
+
+`social` is set as the reference level explicitly in `load_counts()`, so
+`coef = 2` below is `trt_territorial_vs_social` by construction rather than by
+alphabetical accident (finding R3). Asserted rather than assumed:
+
+```{r}
+#| label: check_contrast
+stopifnot(identical(resultsNames(dds)[2], "trt_territorial_vs_social"))
+```
+
+Genes are kept if at least a third of samples have 10 or more counts. Note this
+filtering happens *after* `DESeq()`, so dispersions were estimated on the full
+matrix — preserved from the original, which the committed results depend on.
+
+```{r}
+#| label: filter
+n_before <- nrow(dds)
+dds <- dds[rowSums(DESeq2::counts(dds) >= 10) >= ncol(cts) / 3, ]
+cat("genes before filtering:", n_before, "\n")
+cat("genes after filtering: ", nrow(dds), "\n")
+```
+
+## Ordination and sample clustering
+
+```{r}
+#| label: pca
+#| fig-width: 8
+#| fig-height: 7
+p <- pca(assay(vst(dds)), metadata = coldata)
+
+screeplot(p, axisLabSize = 18, titleLabSize = 22)
+
+bp1 <- biplot(p, x = "PC1", y = "PC2",
+              colby    = "trt",
+              colkey   = c(territorial = "royalblue1", social = "red3"),
+              shape    = "trt",
+              shapekey = c(territorial = 19, social = 17),
+              pointSize = 4,
+              showLoadings = FALSE,
+              lab = NULL,
+              drawConnectors = FALSE,
+              ellipse = TRUE, ellipseLevel = 0.95, ellipseFill = FALSE,
+              ellipseAlpha = 1/4, ellipseLineSize = 1,
+              xlim = cfg$pca_xlim, ylim = c(-100, 100),
+              gridlines.major = FALSE, gridlines.minor = FALSE,
+              borderWidth = 1,
+              legendPosition = "top", legendLabSize = 16, legendIconSize = 6.0) +
+  theme(axis.text.x  = element_text(size = 16, colour = "black"),
+        axis.text.y  = element_text(size = 16, colour = "black"),
+        axis.ticks.x = element_line(colour = "black"),
+        axis.ticks.y = element_line(colour = "black"))
+bp1
+
+bp2 <- pairsplot(p,
+                 components = getComponents(p, c(1:5)),
+                 triangle = TRUE, trianglelabSize = 12,
+                 hline = 0, vline = 0,
+                 pointSize = 1,
+                 gridlines.major = FALSE, gridlines.minor = FALSE,
+                 colby = "trt",
+                 title = "Pairs plot", plotaxes = FALSE,
+                 margingaps = unit(c(-0.01, -0.01, -0.01, -0.01), "cm"))
+bp2
+
+rld     <- rlog(dds, blind = TRUE)
+rld_cor <- cor(assay(rld))
+bp3     <- pheatmap(rld_cor, annotation = coldata[, 1:2])
+bp3
+```
+
+Exports are written to full paths. The original wrapped these in
+`setwd("DESEQ_output/<tissue>")` followed by two `setwd('..')` calls, which
+knitr resets at every chunk boundary (finding R7).
+
+```{r}
+#| label: export_ordination
+ggexport(filename = out_path(cfg, cfg$prefix, "-PCA.png"),
+         plot = bp1, res = 600, width = 4000, height = 5000)
+
+ggexport(filename = out_path(cfg, cfg$prefix, "-PAIRS.png"),
+         plot = bp2, res = 600, width = 6000, height = 6000)
+
+ggexport(filename = out_path(cfg, cfg$prefix, "-pheatmap.png"),
+         plot = bp3, res = 600, width = 6000, height = 6000)
+```
+
+## Contrasts and shrinkage
+
+```{r}
+#| label: contrasts
+res_table        <- results(dds, contrast = c("trt", "territorial", "social"), alpha = 0.05)
+res_table_normal <- lfcShrink(dds, coef = 2, type = "normal")
+res_table_apeglm <- lfcShrink(dds, coef = 2, type = "apeglm")
+res_table_ashr   <- lfcShrink(dds, coef = 2, type = "ashr")
+```
+
+```{r}
+#| label: ma_plots
+#| fig-width: 10
+#| fig-height: 4
+draw_ma <- function() {
+  par(mfrow = c(1, 3), mar = c(4, 4, 2, 1))
+  xlim <- c(1, 1e5); ylim <- c(-3, 3)
+  for (nm in c("normal", "apeglm", "ashr")) {
+    DESeq2::plotMA(get(paste0("res_table_", nm)), xlim = xlim, ylim = ylim, main = nm, cex = .8)
+    abline(h = c(-1.5, 1.5), col = "dodgerblue", lwd = 2)
+  }
+}
+draw_ma()
+
+pdf(file = out_path(cfg, "MA_plots.pdf"))
+draw_ma()
+invisible(dev.off())
+```
+
+## Results tables
+
+Significance is `padj < 0.05`, and only that.
+
+The previous code also defined `lfc.cutoff <- 1.5` and `svalue.cutoff <- 0.005`,
+never used them, and then labelled its outputs
+`DEG_apeglm-s0.005_lfc1.5` — describing a filter that never ran (finding R2).
+The unused variables are gone and the labels now say what was actually done. The
+counts themselves are unchanged.
+
+```{r}
+#| label: tidy_tables
+padj.cutoff <- 0.05
+
+as_gene_tibble <- function(x) {
+  x %>% data.frame() %>% rownames_to_column(var = "gene") %>% as_tibble()
+}
+
+res_table        <- as_gene_tibble(res_table)
+res_table_normal <- as_gene_tibble(res_table_normal)
+res_table_apeglm <- as_gene_tibble(res_table_apeglm)
+res_table_ashr   <- as_gene_tibble(res_table_ashr)
+
+cat("Total genes:", nrow(res_table), "\n")
+cat("Genes after NAs removed:", nrow(na.omit(res_table)), "\n")
+
+res_table        <- na.omit(res_table)
+res_table_normal <- na.omit(res_table_normal)
+res_table_apeglm <- na.omit(res_table_apeglm)
+res_table_ashr   <- na.omit(res_table_ashr)
+```
+
+```{r}
+#| label: annotate
+annotate_genes <- function(tbl) {
+  tbl %>%
+    left_join(feature_table, by = "gene") %>%
+    arrange(-log2FoldChange) %>%
+    mutate(treatment = cfg$tissue)
+}
+
+all_genes        <- annotate_genes(res_table)
+all_genes_normal <- annotate_genes(res_table_normal)
+all_genes_apeglm <- annotate_genes(res_table_apeglm)
+all_genes_ashr   <- annotate_genes(res_table_ashr)
+
+sig_genes        <- annotate_genes(filter(res_table,        padj < padj.cutoff))
+sig_genes_normal <- annotate_genes(filter(res_table_normal, padj < padj.cutoff))
+sig_genes_apeglm <- annotate_genes(filter(res_table_apeglm, padj < padj.cutoff))
+sig_genes_ashr   <- annotate_genes(filter(res_table_ashr,   padj < padj.cutoff))
+```
+
+```{r}
+#| label: single_gene_counts
+## Normalised counts for every significant gene, per shrinkage estimator.
+single_gene_counts <- function(sig) {
+  if (nrow(sig) == 0) return(data.frame())
+  do.call(rbind, lapply(sig$gene, function(locid) {
+    d <- plotCounts(dds, gene = locid, intgroup = "trt", returnData = TRUE)
+    d$gene   <- locid
+    d$sample <- rownames(d)
+    rownames(d) <- NULL
+    d
+  }))
+}
+
+counts_unshrunk <- single_gene_counts(sig_genes)
+counts_normal   <- single_gene_counts(sig_genes_normal)
+counts_apeglm   <- single_gene_counts(sig_genes_apeglm)
+counts_ashr     <- single_gene_counts(sig_genes_ashr)
+
+write.table(counts_unshrunk, out_path(cfg, cfg$prefix, "-unshrunk-single-gene-counts.csv"), row.names = FALSE, sep = ",")
+write.table(counts_normal,   out_path(cfg, cfg$prefix, "-normal-single-gene-counts.csv"),   row.names = FALSE, sep = ",")
+write.table(counts_apeglm,   out_path(cfg, cfg$prefix, "-apeglm-single-gene-counts.csv"),   row.names = FALSE, sep = ",")
+write.table(counts_ashr,     out_path(cfg, cfg$prefix, "-ashr-single-gene-counts.csv"),     row.names = FALSE, sep = ",")
+```
+
+```{r}
+#| label: write_tables
+gene_counts <- data.frame(count = c(
+  nrow(cts), nrow(dds), nrow(cts) - nrow(dds),
+  nrow(all_genes), nrow(all_genes_normal), nrow(all_genes_apeglm), nrow(all_genes_ashr),
+  nrow(sig_genes), nrow(sig_genes_normal), nrow(sig_genes_apeglm), nrow(sig_genes_ashr)
+), row.names = c(
+  "genes_before_filtering", "genes_after_filtering", "genes_dropped",
+  "DEGs_all-genes", "DEGs_all-genes-normal", "DEGs_all-genes-apeglm", "DEGs_all-genes-ashr",
+  "DEG_unshrunken-p0.05", "DEG_normal-p0.05", "DEG_apeglm-p0.05", "DEG_ashr-p0.05"
+))
+gene_counts
+
+write.table(all_genes,        out_path(cfg, cfg$prefix, "-ALL-DEG.csv"),            row.names = FALSE, sep = ",")
+write.table(all_genes_normal, out_path(cfg, cfg$prefix, "-ALL-DEG-normal.csv"),     row.names = FALSE, sep = ",")
+write.table(all_genes_apeglm, out_path(cfg, cfg$prefix, "-ALL-DEG-apeglm.csv"),     row.names = FALSE, sep = ",")
+write.table(all_genes_ashr,   out_path(cfg, cfg$prefix, "-ALL-DEG-ashr.csv"),       row.names = FALSE, sep = ",")
+write.table(sig_genes,        out_path(cfg, cfg$prefix, "-SIG-DEG-unshrunken.csv"), row.names = FALSE, sep = ",")
+write.table(sig_genes_normal, out_path(cfg, cfg$prefix, "-SIG-DEG-normal.csv"),     row.names = FALSE, sep = ",")
+write.table(sig_genes_apeglm, out_path(cfg, cfg$prefix, "-SIG-DEG-apeglm.csv"),     row.names = FALSE, sep = ",")
+write.table(sig_genes_ashr,   out_path(cfg, cfg$prefix, "-SIG-DEG-ashr.csv"),       row.names = FALSE, sep = ",")
+write.table(gene_counts,      out_path(cfg, cfg$prefix, "-gene-counts.csv"),        row.names = TRUE, sep = ",")
+```
+
+## Volcano plots
+
+```{r}
+#| label: volcanoes
+#| fig-width: 6
+#| fig-height: 4
+volcano <- function(tbl) {
+  ggplot(tbl, aes(x = log2FoldChange, y = -log10(pvalue))) +
+    geom_point(aes(color = log2FoldChange > 0))
+}
+
+volcano_specs <- list(
+  list(file = "Volcano_all_genes.png",        data = all_genes),
+  list(file = "Volcano_all_genes_normal.png", data = all_genes_normal),
+  list(file = "Volcano_all_genes_ashr.png",   data = all_genes_ashr),
+  list(file = "Volcano_all_genes_apeglm.png", data = all_genes_apeglm),
+  list(file = "Volcano_sig_genes.png",        data = sig_genes),
+  list(file = "Volcano_sig_genes_normal.png", data = sig_genes_normal),
+  list(file = "Volcano_sig_genes_ashr.png",   data = sig_genes_ashr),
+  list(file = "Volcano_sig_genes_apeglm.png", data = sig_genes_apeglm)
+)
+
+for (spec in volcano_specs) {
+  p <- volcano(spec$data)
+  print(p)
+  ggsave(out_path(cfg, spec$file), plot = p,
+         dpi = 600, device = "png", width = 6, height = 4, units = "in")
+}
+```
+
+## Expression heatmap
+
+Column annotation colours are derived from `coldata`. The previous code wrote
+`rep("royalblue1", 15)` / `rep("red3", 15)` for liver and `14` / `14` for gonad,
+hardcoding both the group sizes and the column order (finding R4).
+
+```{r}
+#| label: heatmap
+sigs <- res_table_apeglm %>%
+  filter(padj < 0.05) %>%
+  left_join(feature_table, by = "gene")
+
+df_sigs <- as.data.frame(sigs)
+stopifnot(!anyDuplicated(df_sigs$gene))
+rownames(df_sigs) <- df_sigs$gene
+
+rlog_out <- rlog(dds, blind = FALSE)
+mat_sigs <- assay(rlog_out)[rownames(df_sigs), rownames(coldata)]
+colnames(mat_sigs) <- rownames(coldata)
+
+## Z-score each gene across samples.
+mat_scaled_sigs <- t(apply(mat_sigs, 1, scale))
+colnames(mat_scaled_sigs) <- colnames(mat_sigs)
+
+side_colours <- trt_side_colours(coldata)
+stopifnot(length(side_colours) == ncol(mat_scaled_sigs))
+
+png(filename = out_path(cfg, cfg$heatmap_prefix, "_heatmap_pval_genes_apeglm.png"),
+    res = 1200, width = 6000, height = 6000, units = "px", pointsize = 6)
+heatmap(mat_scaled_sigs, scale = "none",
+        col = colorRampPalette(brewer.pal(11, "RdYlBu"))(256),
+        ColSideColors = side_colours)
+invisible(dev.off())
+```
+
+## Session
+
+```{r}
+#| label: session
+sessionInfo()
+```

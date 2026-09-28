@@ -1,0 +1,100 @@
+---
+title: "Gene tables"
+subtitle: "Splitting the significant DEGs by annotation status"
+date: today
+---
+
+Replaces `3_generate_gene_tables-salmon.Rmd`, which loaded `liver` and `gonad`
+and then operated on `control_ploidy`, `heat_ploidy`, `diploid_heat` and five
+other objects that never existed — leftovers from an oyster ploidy ×
+multistressor experiment. It also read the DESeq2 CSVs with `sep=" "` when they
+were written with `sep=","`, and its final chunk did not parse (finding B2).
+
+Whatever produced the committed `gene_tables/` was therefore not in the
+repository. The rule has been reconstructed from those outputs and verified
+against both tissues:
+
+1. Drop genes with **no description** — no match in the LOCID table. These are
+   the rows the old oyster code called `LOCNA`.
+2. Of the rest, **uncharacterized** are those whose description begins with
+   `uncharacterized`; everything else is **characterized**.
+
+```{r}
+#| label: setup
+library(dplyr)
+source("tag-seq/code/_common.R")
+
+GENE_TABLE_DIR <- "tag-seq/gene_tables"
+dir.create(GENE_TABLE_DIR, recursive = TRUE, showWarnings = FALSE)
+```
+
+```{r}
+#| label: split
+split_by_annotation <- function(tissue) {
+  cfg <- tissue_config(tissue)
+  sig <- read.csv(out_path(cfg, cfg$prefix, "-SIG-DEG-apeglm.csv"),
+                  stringsAsFactors = FALSE)
+
+  unannotated <- sig %>% filter(is.na(description))
+  annotated   <- sig %>% filter(!is.na(description))
+  uncharacterized <- annotated %>% filter(grepl("^uncharacterized", description))
+  characterized   <- annotated %>% filter(!grepl("^uncharacterized", description))
+
+  list(tissue = tissue, sig = sig, unannotated = unannotated,
+       annotated = annotated, uncharacterized = uncharacterized,
+       characterized = characterized)
+}
+
+tables <- lapply(c("liver", "gonad"), split_by_annotation)
+names(tables) <- c("liver", "gonad")
+
+for (t in tables) {
+  cat(sprintf("%-6s significant %5d | no description %4d | characterized %5d | uncharacterized %3d\n",
+              t$tissue, nrow(t$sig), nrow(t$unannotated),
+              nrow(t$characterized), nrow(t$uncharacterized)))
+}
+```
+
+::: {.callout-important}
+## Output format changed deliberately
+
+The committed tables were written with `quote = FALSE` and `sep = ","`, but
+descriptions contain commas — `uncharacterized LOC115129809, transcript variant X3`.
+In `gonad_characterized.txt` only 754 of 1,280 rows have the expected 8 fields;
+526 have 9, 10 or 11 and cannot be read back correctly. These are now written as
+properly quoted CSV. The rows and values are unchanged; only the quoting is.
+:::
+
+```{r}
+#| label: write_tables
+for (t in tables) {
+  write.csv(t$characterized,
+            file.path(GENE_TABLE_DIR, paste0(t$tissue, "_characterized.txt")),
+            row.names = FALSE)
+  write.csv(t$uncharacterized,
+            file.path(GENE_TABLE_DIR, paste0(t$tissue, "_uncharacterized.txt")),
+            row.names = FALSE)
+  writeLines(t$annotated$gene,
+             file.path(GENE_TABLE_DIR, paste0(t$tissue, "_all_LOCID.txt")))
+}
+
+uncharacterized_stats <- data.frame(
+  known           = vapply(tables, function(t) nrow(t$characterized),   integer(1)),
+  unknown         = vapply(tables, function(t) nrow(t$uncharacterized), integer(1)),
+  row.names       = names(tables)
+)
+uncharacterized_stats$percent_unknown <-
+  uncharacterized_stats$unknown /
+  (uncharacterized_stats$unknown + uncharacterized_stats$known)
+
+uncharacterized_stats
+
+write.csv(uncharacterized_stats,
+          file.path(GENE_TABLE_DIR, "uncharacterized_stats.txt"),
+          row.names = TRUE)
+```
+
+```{r}
+#| label: session
+sessionInfo()
+```
